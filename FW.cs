@@ -197,9 +197,9 @@ namespace Fashion_Wardrobe
                     if (FWMod.APPIsLoadered)
                     {
                         //Log.Warning("1");
-                        if (patchForAPP!=null)
+                        if (patchForAPP != null)
                         {
-                            patchForAPP.GetGraphic(Pawn,item,ref a);
+                            patchForAPP.GetGraphic(Pawn, item, ref a);
                         }
                     }
                     list0.Add(a);
@@ -234,7 +234,7 @@ namespace Fashion_Wardrobe
         }
         internal class PatchForAPP
         {
-            public void GetGraphic(Pawn pawn, Apparel apparel,ref ApparelGraphicRecord apparelGraphicRecord)
+            public void GetGraphic(Pawn pawn, Apparel apparel, ref ApparelGraphicRecord apparelGraphicRecord)
             {
                 MyApparelGraphicRecordGetter.TryGetGraphicApparelR1(MyApparelGraphicRecordGetter.GetDef(pawn.def.defName, pawn.story.bodyType, apparel), apparel, ref apparelGraphicRecord);
             }
@@ -583,7 +583,7 @@ namespace Fashion_Wardrobe
         public static void preFillTab(ref ITab_Pawn_Gear __instance)
         {
             Pawn pawn = (Pawn)getPawn.Invoke(__instance, new object[0]);
-            if ((!FWSetting.OnlyForColonist) || (pawn != null && pawn.IsColonist))
+            if (pawn.GetComp<FashionOverrideComp>() != null && (!FWSetting.OnlyForColonist) || (pawn != null && pawn.IsColonist))
             {
                 Rect rect = new Rect(5f, 5f, 130f, Text.LineHeight);
                 if (Widgets.ButtonText(rect, "Fashion_Wardrobe".Translate()))
