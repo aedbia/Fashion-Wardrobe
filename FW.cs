@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using ApparelPaperPattern;
+using HarmonyLib;
 using RimWorld;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,10 +13,17 @@ namespace Fashion_Wardrobe
     public class FWMod : Mod
     {
         public static int HATWeakerLoadrIndex = -1;
+        public static bool APPIsLoadered = false;
         public FWMod(ModContentPack content) : base(content)
         {
-            HATWeakerLoadrIndex = LoadedModManager.RunningMods.FirstIndexOf(a => a.PackageIdPlayerFacing == "AB.HATweaker");
-
+            HATWeakerLoadrIndex = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "AB.HATweaker");
+            int a = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "nalsnoir.ApparelPaperPattern");
+            int b = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == content.PackageIdPlayerFacing);
+            if (a != -1 && a < b)
+            {
+                APPIsLoadered = true;
+                FashionOverrideComp.patchForAPP = new FashionOverrideComp.PatchForAPP();
+            }
             Harmony harmony = new Harmony(Content.PackageId);
             new HarmonyPatchA8(harmony);
         }
@@ -53,6 +61,7 @@ namespace Fashion_Wardrobe
         private bool draft;
         private bool underRoof;
 
+        internal static PatchForAPP patchForAPP = null;
         internal bool Draft
         {
             get { return draft; }
@@ -185,7 +194,16 @@ namespace Fashion_Wardrobe
                 foreach (Apparel item in Clothes)
                 {
                     ApparelGraphicRecordGetter.TryGetGraphicApparel(item, Pawn.story.bodyType, out ApparelGraphicRecord a);
+                    if (FWMod.APPIsLoadered)
+                    {
+                        //Log.Warning("1");
+                        if (patchForAPP!=null)
+                        {
+                            patchForAPP.GetGraphic(Pawn,item,ref a);
+                        }
+                    }
                     list0.Add(a);
+
                 }
             }
             FashionApparel = new List<ApparelGraphicRecord>();
@@ -212,6 +230,13 @@ namespace Fashion_Wardrobe
                 Scribe_Values.Look(ref Hide, "HideValue", false);
                 Scribe_Values.Look(ref HideInDoor, "HideInDoor", false);
                 Scribe_Values.Look(ref HideNoFight, "HideNoFight", false);
+            }
+        }
+        internal class PatchForAPP
+        {
+            public void GetGraphic(Pawn pawn, Apparel apparel,ref ApparelGraphicRecord apparelGraphicRecord)
+            {
+                MyApparelGraphicRecordGetter.TryGetGraphicApparelR1(MyApparelGraphicRecordGetter.GetDef(pawn.def.defName, pawn.story.bodyType, apparel), apparel, ref apparelGraphicRecord);
             }
         }
     }
@@ -436,6 +461,7 @@ namespace Fashion_Wardrobe
             private Color RGB = new ColorInt(0, 0, 0).ToColor;
             private List<Color> colors = new List<Color>();
             private Apparel apparel = null;
+            private string search = "";
             public SelApparelWindow()
             {
                 doCloseButton = true;
@@ -453,7 +479,9 @@ namespace Fashion_Wardrobe
 
             public override void DoWindowContents(Rect inRect)
             {
-                Rect rect0 = new Rect(inRect.x, inRect.y, inRect.width - 1f, inRect.height * 0.94f);
+                Rect rect = new Rect(inRect.x, inRect.y, inRect.width - 1f, inRect.height * 0.94f);
+                search = Widgets.TextEntryLabeled(rect.TopPart(0.03f), "Search", search);
+                Rect rect0 = rect.BottomPart(0.97f);
                 Rect outRect = new Rect(rect0.x + 2f, rect0.y + 8f, rect0.width * 0.2f - 8f, rect0.height - 18f);
                 Rect viewRect = new Rect(0, 0, outRect.width, (outRect.width + 40f) * AllapparelDef.Count);
                 Widgets.BeginScrollView(outRect, ref scrollPosition, viewRect, false);
@@ -462,16 +490,19 @@ namespace Fashion_Wardrobe
                 for (int i = 0; i < AllapparelDef.Count; i++)
                 {
                     ThingDef def = AllapparelDef[i];
-                    GUI.DrawTexture(viewOne, def.uiIcon);
-                    Widgets.DrawBox(viewOne);
-                    if (Widgets.RadioButtonLabeled(textLoc, def.label, choose == i))
+                    if (def.label.IndexOf(search) != -1)
                     {
-                        choose = i;
+                        GUI.DrawTexture(viewOne, def.uiIcon);
+                        Widgets.DrawBox(viewOne);
+                        if (Widgets.RadioButtonLabeled(textLoc, def.label, choose == i))
+                        {
+                            choose = i;
+                        }
+                        textLoc.y += 30f;
+                        Widgets.DrawLineHorizontal(textLoc.x, textLoc.y, textLoc.width);
+                        viewOne.y += viewRect.width + 40f;
+                        textLoc.y += viewRect.width + 10f;
                     }
-                    textLoc.y += 30f;
-                    Widgets.DrawLineHorizontal(textLoc.x, textLoc.y, textLoc.width);
-                    viewOne.y += viewRect.width + 40f;
-                    textLoc.y += viewRect.width + 10f;
                 }
                 Widgets.EndScrollView();
                 Widgets.DrawLineVertical(rect0.x + (rect0.width * 0.2f + 10f), rect0.y, rect0.height);
@@ -495,7 +526,7 @@ namespace Fashion_Wardrobe
                 if (pawn != null && pawn.GetComp<FashionOverrideComp>() != null)
                 {
                     FashionOverrideComp comp = pawn.GetComp<FashionOverrideComp>();
-                    if (apparel!=null&&!comp.Clothes.Contains(apparel))
+                    if (apparel != null && !comp.Clothes.Contains(apparel))
                     {
                         comp.Clothes.RemoveAll(a => a.def.apparel.layers.Any(b => apparel.def.apparel.layers.Contains(b)));
                         comp.Clothes.TryAdd(apparel, 1);
@@ -509,6 +540,7 @@ namespace Fashion_Wardrobe
                 choose = -1;
                 RGB = colors.Last();
                 pawn = null;
+                search = "";
             }
         }
     }
