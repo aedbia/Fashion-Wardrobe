@@ -30,7 +30,10 @@ namespace Fashion_Wardrobe
         public override void DoSettingsWindowContents(Rect inRect)
         {
             base.DoSettingsWindowContents(inRect);
-            Widgets.CheckboxLabeled(inRect.TopPart(0.1f), "Only_Colonist".Translate(), ref FWSetting.OnlyForColonist);
+            Listing_Standard ls = new Listing_Standard();
+            ls.Begin(inRect);
+            ls.CheckboxLabeled("Only_Colonist".Translate(), ref FWSetting.OnlyForColonist);
+            ls.CheckboxLabeled("Show_InDoorFight".Translate(), ref FWSetting.ShowInDoorFight);
         }
         public override string SettingsCategory()
         {
@@ -41,10 +44,12 @@ namespace Fashion_Wardrobe
     public class FWSetting : ModSettings
     {
         internal static bool OnlyForColonist = true;
+        internal static bool ShowInDoorFight = false;
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_Values.Look(ref OnlyForColonist, "OnlyForColonist", true, true);
+            Scribe_Values.Look(ref ShowInDoorFight, "ShowInDoorFight", false, true);
         }
     }
 
@@ -171,9 +176,16 @@ namespace Fashion_Wardrobe
                         {
                             return true;
                         }
-                        else if (data.HideNoFight && !Pawn.Drafted)
+                        else if (data.HideNoFight)
                         {
-                            return true;
+                            if (!Pawn.Drafted)
+                            {
+                                return true;
+                            }
+                            else if (FWSetting.ShowInDoorFight)
+                            {
+                                return false;
+                            }
                         }
                         else if (data.HideInDoor && Pawn.Map != null && Pawn.Position != null && !Pawn.Position.UsesOutdoorTemperature(Pawn.Map))
                         {
