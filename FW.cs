@@ -1,9 +1,11 @@
 ﻿using ApparelPaperPattern;
 using HarmonyLib;
 using RimWorld;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using UnityEngine;
 using Verse;
 using Verse.Sound;
@@ -14,8 +16,10 @@ namespace Fashion_Wardrobe
     {
         public static int HATWeakerLoadrIndex = -1;
         public static bool APPIsLoadered = false;
+        internal static FWSetting setting;
         public FWMod(ModContentPack content) : base(content)
         {
+            setting = GetSettings<FWSetting>();
             HATWeakerLoadrIndex = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "AB.HATweaker");
             int a = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "nalsnoir.ApparelPaperPattern");
             int b = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == content.PackageIdPlayerFacing);
@@ -24,8 +28,6 @@ namespace Fashion_Wardrobe
                 APPIsLoadered = true;
                 FashionOverrideComp.patchForAPP = new FashionOverrideComp.PatchForAPP();
             }
-            Harmony harmony = new Harmony(Content.PackageId);
-            new HarmonyPatchA8(harmony);
         }
         public override void DoSettingsWindowContents(Rect inRect)
         {
@@ -34,6 +36,7 @@ namespace Fashion_Wardrobe
             ls.Begin(inRect);
             ls.CheckboxLabeled("Only_Colonist".Translate(), ref FWSetting.OnlyForColonist);
             ls.CheckboxLabeled("Show_InDoorFight".Translate(), ref FWSetting.ShowInDoorFight);
+            ls.End();
         }
         public override string SettingsCategory()
         {
@@ -580,25 +583,77 @@ namespace Fashion_Wardrobe
         }
     }
 
-
-    public class HarmonyPatchA8
+    [StaticConstructorOnStartup]
+    public static class HarmonyPatchA8
     {
         private static readonly FW_Windows.PawnApparelSettingWindow apparel_window = new FW_Windows.PawnApparelSettingWindow();
-        private static readonly MethodInfo getPawn = AccessTools.PropertyGetter(typeof(ITab_Pawn_Gear), "SelPawnForGear");
-
-
-        public HarmonyPatchA8(Harmony harmony)
+        internal static MethodInfo getPawn = null;
+        internal static Type RPGInvType = null;
+        static HarmonyPatchA8()
         {
-            harmony.Patch(AccessTools.Method(typeof(ITab_Pawn_Gear), "FillTab"), prefix: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.preFillTab)));
+            Harmony harmony = new Harmony("aedbia.fashionwardrobe");
+            RPGInvType = AccessTools.TypeByName("Sandy_Detailed_RPG_Inventory.Sandy_Detailed_RPG_GearTab");
+            if (RPGInvType == null)
+            {
+                getPawn = AccessTools.PropertyGetter(typeof(ITab_Pawn_Gear), "SelPawnForGear");
+                harmony.Patch(AccessTools.Method(typeof(ITab_Pawn_Gear), "FillTab"), transpiler: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.TranFillTab)));
+            }
+            else
+            {
+                getPawn = AccessTools.PropertyGetter(RPGInvType, "SelPawnForGear");
+                harmony.Patch(AccessTools.Method(RPGInvType, "FillTab"), transpiler: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.TranFillTab)));
+
+            }
             harmony.Patch(AccessTools.Method(typeof(PawnRenderer), "RenderPawnInternal"), prefix: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.PreRenderPawnInternal)));
         }
-        public static void preFillTab(ref ITab_Pawn_Gear __instance)
+
+        public static IEnumerable<CodeInstruction> TranFillTab(IEnumerable<CodeInstruction> codes)
         {
-            Pawn pawn = (Pawn)getPawn.Invoke(__instance, new object[0]);
+            MethodInfo method = AccessTools.Method(typeof(HarmonyPatchA8), nameof(FillTab_1));
+            MethodInfo method1 = AccessTools.Method(typeof(Widgets), nameof(Widgets.CheckboxLabeled));
+            List<CodeInstruction> list = codes.ToList();
+            bool a = false;
+            for (int i = 0; i < list.Count; i++)
+            {
+                CodeInstruction code = list[i];
+                if (!a && code.opcode == OpCodes.Stloc_1)
+                {
+                    a = true;
+                    yield return code;
+                    yield return new CodeInstruction(OpCodes.Ldloc_1);
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, getPawn);
+                    yield return new CodeInstruction(OpCodes.Call, method);
+                }
+                else if (!a && code.opcode == OpCodes.Call && code.operand == (object)method1)
+                {
+                    a = true;
+                    yield return code;
+                    yield return new CodeInstruction(OpCodes.Ldc_R4, 0f);
+                    yield return new CodeInstruction(OpCodes.Ldc_R4, 0f);
+                    yield return new CodeInstruction(OpCodes.Ldc_R4, 320f);
+                    yield return new CodeInstruction(OpCodes.Ldc_R4, 0f);
+                    yield return new CodeInstruction(OpCodes.Newobj, AccessTools.Constructor(typeof(Rect), new Type[]
+                    {
+                        typeof(float),typeof(float),typeof(float), typeof(float)
+                    }));
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, getPawn);
+                    yield return new CodeInstruction(OpCodes.Call, method);
+                }
+                else
+                {
+                    yield return code;
+                }
+            }
+        }
+
+        public static void FillTab_1(Rect rect, Pawn pawn)
+        {
             if (pawn.GetComp<FashionOverrideComp>() != null && (!FWSetting.OnlyForColonist) || (pawn != null && pawn.IsColonist))
             {
-                Rect rect = new Rect(5f, 5f, 130f, Text.LineHeight);
-                if (Widgets.ButtonText(rect, "Fashion_Wardrobe".Translate()))
+                Rect rect1 = RPGInvType == null ? new Rect(5f, 5f, 130f, Text.LineHeight) : new Rect(rect.width - 150f, 5f, 130f, Text.LineHeight);
+                if (Widgets.ButtonText(rect1, "Fashion_Wardrobe".Translate()))
                 {
                     if (!apparel_window.IsOpen)
                     {
