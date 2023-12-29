@@ -191,18 +191,14 @@ namespace Fashion_Wardrobe
                 {
                     MakeFashionApparel();
                     ReCollect = false;
-                    //Log.Warning("b");
                 }
                 if (!Clothes.InnerListForReading.NullOrEmpty())
                 {
                     Pawn.Drawer.renderer.graphics.apparelGraphics = new List<ApparelGraphicRecord>(FashionApparel);
-                    RemoveNoDisplayGraphic(ref Pawn.Drawer.renderer.graphics.apparelGraphics);
-                }
-                else
-                {
-                    RemoveNoDisplayGraphic(ref Pawn.Drawer.renderer.graphics.apparelGraphics);
                 }
             }
+            RemoveNoDisplayGraphic(ref Pawn.Drawer.renderer.graphics.apparelGraphics);
+
         }
         public void RemoveNoDisplayGraphic(ref List<ApparelGraphicRecord> apparels)
         {
@@ -380,12 +376,14 @@ namespace Fashion_Wardrobe
                 List<TabRecord> tabs = new List<TabRecord>
             {
                 new TabRecord("Wear_Apparel".Translate(), () =>
-            {
-                tabInt = 0;
-            }, tabInt == 0),
+                {
+                    tabInt = 0;
+                    scrollPosition = Vector2.zero;
+                }, tabInt == 0),
                 new TabRecord("Fashion_Apparel".Translate(), () =>
                 {
                     tabInt = 1;
+                    scrollPosition = Vector2.zero;
                 }, tabInt == 1)
             };
                 Rect rect1 = new Rect(inRect.x, inRect.y + inRect.height * a, inRect.width - 1f, inRect.height * 0.89f);
@@ -639,16 +637,30 @@ namespace Fashion_Wardrobe
                     }
                     if (def.CanBeStyled())
                     {
-                        Rect rect2 = new Rect(rect1.x, rect1.y + rect1.height * 0.50f, rect1.width, rect.height * 0.1f);
+                        Rect rect2 = new Rect(rect1.x, rect1.y + rect1.height * 0.50f, rect1.width, rect.height * 0.09f);
                         if (!styles.NullOrEmpty())
                         {
-                            float width = (rect2.height + 5f) * (styles.Count + 1) + 5f;
-                            Rect BG = new Rect(rect2.x, rect2.y - 5f, Math.Min(width, rect2.width), rect2.height + 10f);
+                            float width = (rect2.height + 5f) * (styles.Count + 1);
+                            Rect BG = new Rect(rect2.x, rect2.y - 5f, Math.Min(width, 5f * (rect2.height + 5f)) + 5f, rect2.height + 10f);
+                            if (styles.Count > 5)
+                            {
+                                Rect rect3 = new Rect(BG.x, BG.y, rect2.width * 0.06f + 1f, BG.height);
+                                if (Widgets.ButtonText(rect3, "<"))
+                                {
+                                    scrollPosition_1.x -= (rect2.height + 5f) * 5f;
+                                }
+                                rect3.x += BG.width + rect3.width + 10f;
+                                if (Widgets.ButtonText(rect3, ">"))
+                                {
+                                    scrollPosition_1.x += (rect2.height + 5f) * 5f;
+                                }
+                                rect2.x += rect3.width + 5f;
+                                BG.x += rect3.width + 5f;
+                            }
                             Widgets.DrawBox(BG);
                             Widgets.DrawTitleBG(BG);
-                            Widgets.BeginScrollView(rect2, ref scrollPosition_1, new Rect(0, 0, width, rect2.height), false);
+                            Widgets.BeginScrollView(new Rect(rect2.x + 5f, rect2.y, (rect2.height + 5f) * 5f, rect2.height), ref scrollPosition_1, new Rect(0, 0, width, rect2.height), false);
                             Rect GrapLoc = new Rect(0, 0, rect2.height, rect2.height);
-                            GrapLoc.x += 5f;
                             if (RadioTexture(GrapLoc, thingStyleDef == null, def.uiIcon, def.label))
                             {
                                 thingStyleDef = null;
