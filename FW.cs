@@ -1,5 +1,4 @@
-﻿using ApparelPaperPattern;
-using HarmonyLib;
+﻿using HarmonyLib;
 using RimWorld;
 using System;
 using System.Collections.Generic;
@@ -15,19 +14,19 @@ namespace Fashion_Wardrobe
     public class FWMod : Mod
     {
         public static int HATWeakerLoadrIndex = -1;
-        public static bool APPIsLoadered = false;
+        //public static bool APPIsLoadered = false;
         internal static FWSetting setting;
         public FWMod(ModContentPack content) : base(content)
         {
             setting = GetSettings<FWSetting>();
             HATWeakerLoadrIndex = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "AB.HATweaker");
-            int a = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "nalsnoir.ApparelPaperPattern");
-            int b = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == content.PackageIdPlayerFacing);
-            if (a != -1 && a < b)
+            //int a = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "nalsnoir.ApparelPaperPattern");
+            //int b = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == content.PackageIdPlayerFacing);
+            /*if (a != -1 && a < b)
             {
                 APPIsLoadered = true;
-                FashionOverrideComp.patchForAPP = new FashionOverrideComp.PatchForAPP();
-            }
+                //FashionOverrideComp.patchForAPP = new FashionOverrideComp.PatchForAPP();
+            }*/
         }
         public override void DoSettingsWindowContents(Rect inRect)
         {
@@ -85,14 +84,14 @@ namespace Fashion_Wardrobe
         private Pawn Pawn => (parent as Pawn);
 
         internal bool FashionClothesEnable;
-        internal ThingOwner<Apparel> Clothes = new ThingOwner<Apparel>();
-        internal List<ApparelGraphicRecord> FashionApparel = new List<ApparelGraphicRecord>();
+        internal ThingOwner<Apparel> Clothes;
+        internal List<Apparel> FashionApparel = new List<Apparel>();
         internal Dictionary<string, FWCompData> DrawRule = new Dictionary<string, FWCompData>();
 
         private bool draft;
         private bool underRoof;
 
-        internal static PatchForAPP patchForAPP = null;
+        //internal static PatchForAPP patchForAPP = null;
         internal bool Draft
         {
             get { return draft; }
@@ -124,22 +123,24 @@ namespace Fashion_Wardrobe
             }
         }
         public bool UnderRoofChange = false;
-
-        internal bool ReCollect = true;
         public bool listion = false;
 
         public FashionOverrideComp()
         {
             FashionClothesEnable = FWSetting.DefaultEnableFashion;
+            Clothes = new ThingOwner<Apparel>(new ApparelHolder(this));
         }
 
         public override void PostExposeData()
         {
             Scribe_Values.Look(ref FashionClothesEnable, "FashionClothesEnable", true);
-            Scribe_Deep.Look(ref Clothes, "clothes");
+            Scribe_Deep.Look(ref Clothes, "clothes", new object[]
+            {
+                new ApparelHolder(this)
+            });
             if (Clothes == null)
             {
-                Clothes = new ThingOwner<Apparel>();
+                Clothes = new ThingOwner<Apparel>(new ApparelHolder(this));
             }
             Scribe_Collections.Look(ref DrawRule, "DrawRule", LookMode.Value, LookMode.Deep);
             if (DrawRule == null)
@@ -183,31 +184,47 @@ namespace Fashion_Wardrobe
             }
         }
 
-        public void ApplyApparel()
+        public List<Apparel> GetApparel()
         {
-            if (FashionClothesEnable)
+            List<Apparel> list0;
+            if (Clothes.Count != 0 && FashionClothesEnable)
             {
-                if (Pawn.story != null && ReCollect)
+                list0 = new List<Apparel>(Clothes);
+            }
+            else
+            {
+                list0 = new List<Apparel>();
+            }
+
+            List<Apparel> list1;
+            if (!Pawn.apparel.WornApparel.NullOrEmpty())
+            {
+                list1 = new List<Apparel>(Pawn.apparel.WornApparel);
+                if (!list0.NullOrEmpty())
                 {
-                    MakeFashionApparel();
-                    ReCollect = false;
-                }
-                if (!Clothes.InnerListForReading.NullOrEmpty())
-                {
-                    Pawn.Drawer.renderer.graphics.apparelGraphics = new List<ApparelGraphicRecord>(FashionApparel);
+                    list1.RemoveAll(a => a.def.apparel.layers.Any(b => list0.Any(c => c.def.apparel.layers.Contains(b))));
+                    list1.AddRange(list0);
                 }
             }
-            RemoveNoDisplayGraphic(ref Pawn.Drawer.renderer.graphics.apparelGraphics);
-
+            else
+            {
+                list1 = new List<Apparel>();
+                if (!list0.NullOrEmpty())
+                {
+                    list1.AddRange(list0);
+                }
+            }
+            RemoveNoDisplayGraphic(ref list1);
+            return list1;
         }
-        public void RemoveNoDisplayGraphic(ref List<ApparelGraphicRecord> apparels)
+        public void RemoveNoDisplayGraphic(ref List<Apparel> apparels)
         {
             apparels.RemoveAll(a =>
             {
-                if (!DrawRule.NullOrEmpty() && DrawRule.ContainsKey(a.sourceApparel.def.defName))
+                if (!DrawRule.NullOrEmpty() && DrawRule.ContainsKey(a.def.defName))
                 {
                     {
-                        FWCompData data = DrawRule[a.sourceApparel.def.defName];
+                        FWCompData data = DrawRule[a.def.defName];
                         if (data.Hide)
                         {
                             return true;
@@ -236,40 +253,6 @@ namespace Fashion_Wardrobe
                 return false;
             });
         }
-        private void MakeFashionApparel()
-        {
-            List<ApparelGraphicRecord> list0 = new List<ApparelGraphicRecord>();
-            if (Clothes.Count != 0)
-            {
-
-                foreach (Apparel item in Clothes)
-                {
-                    ApparelGraphicRecordGetter.TryGetGraphicApparel(item, Pawn.story.bodyType, out ApparelGraphicRecord a);
-                    if (FWMod.APPIsLoadered)
-                    {
-                        //Log.Warning("1");
-                        if (patchForAPP != null)
-                        {
-                            patchForAPP.GetGraphic(Pawn, item, ref a);
-                        }
-                    }
-                    list0.Add(a);
-
-                }
-            }
-            FashionApparel = new List<ApparelGraphicRecord>();
-            List<ApparelGraphicRecord> list1 = Pawn.Drawer.renderer.graphics.apparelGraphics;
-            if (!list1.NullOrEmpty())
-            {
-                FashionApparel.AddRange(list1);
-            }
-            //Log.Warning(FashionApparel.Count.ToString());
-            if (!list0.NullOrEmpty())
-            {
-                FashionApparel.RemoveAll(a => a.sourceApparel.def.apparel.layers.Any(b => list0.Any(c => c.sourceApparel.def.apparel.layers.Contains(b))));
-                FashionApparel.AddRange(list0);
-            }
-        }
 
         public class FWCompData : IExposable
         {
@@ -283,13 +266,33 @@ namespace Fashion_Wardrobe
                 Scribe_Values.Look(ref HideNoFight, "HideNoFight", false);
             }
         }
-        internal class PatchForAPP
+        public class ApparelHolder : IThingHolder
+        {
+            public FashionOverrideComp comp;
+            public IThingHolder ParentHolder => comp.ParentHolder;
+
+            public ApparelHolder(FashionOverrideComp comp)
+            {
+                this.comp = comp;
+            }
+
+            public void GetChildHolders(List<IThingHolder> outChildren)
+            {
+                ThingOwnerUtility.AppendThingHoldersFromThings(outChildren, GetDirectlyHeldThings());
+            }
+
+            public ThingOwner GetDirectlyHeldThings()
+            {
+                return comp.Clothes ?? new ThingOwner<Apparel>();
+            }
+        }
+        /*internal class PatchForAPP
         {
             public void GetGraphic(Pawn pawn, Apparel apparel, ref ApparelGraphicRecord apparelGraphicRecord)
             {
                 MyApparelGraphicRecordGetter.TryGetGraphicApparelR1(MyApparelGraphicRecordGetter.GetDef(pawn.def.defName, pawn.story.bodyType, apparel), apparel, ref apparelGraphicRecord);
             }
-        }
+        }*/
     }
     internal static class FW_Windows
     {
@@ -471,20 +474,10 @@ namespace Fashion_Wardrobe
                     {
                         bool d = false;
                         Apparel apparel = apparels[x];
-                        Texture2D texture;
-                        if (apparel.GetStyleDef() != null)
-                        {
-                            texture = apparel.GetStyleDef().UIIcon;
-                        }
-                        else
-                        {
-                            texture = apparel.def.uiIcon;
-                        }
-                        GUI.DrawTexture(iconLoc, texture, ScaleMode.StretchToFill, true, 0f, apparel.DrawColor, 0f, 0f);
+                        Widgets.ThingIcon(iconLoc, apparel);
                         if (drawRemove && Widgets.ButtonText(butLoc, "Remove".Translate()))
                         {
                             comp.Clothes.Remove(apparel);
-                            comp.ReCollect = true;
                             d = true;
                         }
                         GUI.Label(LabelLoc, apparel.Label, GUI.skin.button);
@@ -717,9 +710,15 @@ namespace Fashion_Wardrobe
                     FashionOverrideComp comp = pawn.GetComp<FashionOverrideComp>();
                     if (apparel != null && !comp.Clothes.Contains(apparel))
                     {
-                        comp.Clothes.RemoveAll(a => a.def.apparel.layers.Any(b => apparel.def.apparel.layers.Contains(b)));
+                        comp.Clothes.RemoveAll(a =>
+                        {
+                            if (a.def.apparel.layers.Any(b => apparel.def.apparel.layers.Contains(b)))
+                            {
+                                return a.def.apparel.bodyPartGroups.Any(b => apparel.def.apparel.bodyPartGroups.Contains(b));
+                            }
+                            return false;
+                        });
                         comp.Clothes.TryAdd(apparel, 1);
-                        comp.ReCollect = true;
                     }
                     if (pawn.apparel != null)
                     {
@@ -764,6 +763,8 @@ namespace Fashion_Wardrobe
         private static readonly FW_Windows.PawnApparelSettingWindow apparel_window = new FW_Windows.PawnApparelSettingWindow();
         internal static MethodInfo getPawn = null;
         internal static Type RPGInvType = null;
+        private static readonly Type patch = typeof(HarmonyPatchA8);
+        private static readonly Type renderTree = typeof(PawnRenderTree);
         static HarmonyPatchA8()
         {
             Harmony harmony = new Harmony("aedbia.fashionwardrobe");
@@ -771,15 +772,59 @@ namespace Fashion_Wardrobe
             if (RPGInvType == null)
             {
                 getPawn = AccessTools.PropertyGetter(typeof(ITab_Pawn_Gear), "SelPawnForGear");
-                harmony.Patch(AccessTools.Method(typeof(ITab_Pawn_Gear), "FillTab"), transpiler: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.TranFillTab)));
+                harmony.Patch(AccessTools.Method(typeof(ITab_Pawn_Gear), "FillTab"), transpiler: new HarmonyMethod(patch, nameof(HarmonyPatchA8.TranFillTab)));
             }
             else
             {
                 getPawn = AccessTools.PropertyGetter(RPGInvType, "SelPawnForGear");
-                harmony.Patch(AccessTools.Method(RPGInvType, "FillTab"), transpiler: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.TranFillTab)));
+                harmony.Patch(AccessTools.Method(RPGInvType, "FillTab"), transpiler: new HarmonyMethod(patch, nameof(HarmonyPatchA8.TranFillTab)));
 
             }
-            harmony.Patch(AccessTools.Method(typeof(PawnRenderer), "RenderPawnInternal"), prefix: new HarmonyMethod(typeof(HarmonyPatchA8), nameof(HarmonyPatchA8.PreRenderPawnInternal)));
+            MethodInfo setupApparel = AccessTools.Method(renderTree, "SetupApparelNodes");
+            if (setupApparel != null)
+            {
+                harmony.Patch(setupApparel, transpiler: new HarmonyMethod(patch, nameof(TranSetupApparelNodes)));
+            }
+            MethodInfo ApparelWearGetter = AccessTools.PropertyGetter(typeof(Apparel), "Wearer");
+            if (ApparelWearGetter != null)
+            {
+                harmony.Patch(ApparelWearGetter, transpiler: new HarmonyMethod(patch, nameof(TranWearerGetter)));
+            }
+            if (LoadedModManager.RunningModsListForReading.FindIndex(mod => mod.PackageIdPlayerFacing == "AB.HATweaker") == -1)
+            {
+                MethodInfo adjustParms = AccessTools.Method(renderTree, "AdjustParms");
+                if (adjustParms != null)
+                {
+                    harmony.Patch(adjustParms, transpiler: new HarmonyMethod(patch, nameof(TranAdjustParms)));
+                }
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> TranWearerGetter(IEnumerable<CodeInstruction> codes)
+        {
+            MethodInfo method = AccessTools.Method(typeof(HarmonyPatchA8), nameof(GetWearer));
+            MethodInfo method0 = AccessTools.PropertyGetter(typeof(Thing), nameof(Thing.ParentHolder));
+            List<CodeInstruction> list = codes.ToList();
+            for (int i = 0; i < list.Count; i++)
+            {
+                CodeInstruction code = list[i];
+                if (code.opcode == OpCodes.Ldnull)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, method0);
+                    yield return new CodeInstruction(OpCodes.Call, method);
+                }
+                else
+                {
+                    yield return code;
+                }
+            }
+        }
+
+        public static Pawn GetWearer(IThingHolder holder)
+        {
+            //Log.Warning((holder is FashionOverrideComp).ToStringSafe());
+            return holder is FashionOverrideComp.ApparelHolder ? (holder as FashionOverrideComp.ApparelHolder).comp.parent as Pawn : null;
         }
 
         public static IEnumerable<CodeInstruction> TranFillTab(IEnumerable<CodeInstruction> codes)
@@ -838,23 +883,82 @@ namespace Fashion_Wardrobe
                 }
             }
         }
-        public static void PreRenderPawnInternal(Pawn ___pawn)
+        public static IEnumerable<CodeInstruction> TranSetupApparelNodes(IEnumerable<CodeInstruction> codes)
         {
-            Pawn pawn = ___pawn;
-            /*if (pawn.RaceProps != null && pawn.RaceProps.Humanlike)
+            MethodInfo wornApparelCount = AccessTools.PropertyGetter(typeof(Pawn_ApparelTracker), nameof(Pawn_ApparelTracker.WornApparelCount));
+            MethodInfo wornApparel = AccessTools.PropertyGetter(typeof(Pawn_ApparelTracker), nameof(Pawn_ApparelTracker.WornApparel));
+            List<CodeInstruction> list = codes.ToList();
+            for (int i = 0; i < list.Count; i++)
             {
-                return;
-            }*/
+                CodeInstruction code = list[i];
+                if (code.opcode == OpCodes.Callvirt && code.OperandIs(wornApparelCount))
+                {
+
+                    yield return new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(patch, nameof(GetDisplayApparelCount)));
+                }
+                else
+                if (code.opcode == OpCodes.Callvirt && code.OperandIs(wornApparel))
+                {
+                    yield return code;
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(renderTree, nameof(PawnRenderTree.pawn)));
+                    yield return new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(patch, nameof(GetFWApparel)));
+                }
+                else
+                {
+                    yield return code;
+                }
+            }
+        }
+        public static int GetDisplayApparelCount(Pawn_ApparelTracker pawn_Apparel)
+        {
+            if (pawn_Apparel.pawn != null && FWork(pawn_Apparel.pawn))
+            {
+                FashionOverrideComp comp = pawn_Apparel.pawn.GetComp<FashionOverrideComp>();
+                return comp.GetApparel().Count;
+            }
+            return pawn_Apparel.WornApparelCount;
+        }
+        public static IEnumerable<CodeInstruction> TranAdjustParms(IEnumerable<CodeInstruction> codes)
+        {
+            MethodInfo method = AccessTools.PropertyGetter(typeof(Pawn_ApparelTracker), nameof(Pawn_ApparelTracker.WornApparel));
+            List<CodeInstruction> list = codes.ToList();
+            for (int i = 0; i < list.Count; i++)
+            {
+                CodeInstruction code = list[i];
+                if (code.Is(OpCodes.Callvirt, method))
+                {
+                    yield return code;
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Ldfld, typeof(PawnRenderTree).GetField("pawn"));
+                    yield return new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(patch, nameof(GetFWApparel)));
+                }
+                else
+                {
+                    yield return code;
+                }
+            }
+        }
+        public static bool FWork(Pawn pawn)
+        {
             if (pawn.GetComp<FashionOverrideComp>() == null || pawn.apparel == null)
             {
-                return;
+                return false;
             }
             if (FWSetting.OnlyForColonist && (!pawn.IsColonist))
             {
-                return;
+                return false;
             }
-            FashionOverrideComp comp = pawn.GetComp<FashionOverrideComp>();
-            comp.ApplyApparel();
+            return true;
+        }
+        private static List<Apparel> GetFWApparel(List<Apparel> origin, Pawn pawn)
+        {
+            if (pawn != null && FWork(pawn))
+            {
+                FashionOverrideComp comp = pawn.GetComp<FashionOverrideComp>();
+                return comp.GetApparel();
+            }
+            return origin;
         }
     }
 }
