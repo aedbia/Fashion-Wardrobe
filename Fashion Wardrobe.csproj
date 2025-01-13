@@ -18,7 +18,7 @@
     <DebugSymbols>false</DebugSymbols>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>E:\SteamLibrary\steamapps\common\RimWorld\Mods\Fashion Wardrobe\Assemblies\</OutputPath>
+    <OutputPath>E:\SteamLibrary\steamapps\common\RimWorld\Mods\Fashion Wardrobe\1.5\Assemblies\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>none</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -35,10 +35,6 @@
   <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2009463077\Current\Assemblies\0Harmony.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="ApparelPaperPattern">
-      <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2480887589\1.4\Assemblies\ApparelPaperPattern.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
