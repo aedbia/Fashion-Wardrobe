@@ -14,19 +14,11 @@ namespace Fashion_Wardrobe
     public class FWMod : Mod
     {
         public static int HATWeakerLoadrIndex = -1;
-        //public static bool APPIsLoadered = false;
         internal static FWSetting setting;
         public FWMod(ModContentPack content) : base(content)
         {
             setting = GetSettings<FWSetting>();
             HATWeakerLoadrIndex = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "AB.HATweaker");
-            //int a = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == "nalsnoir.ApparelPaperPattern");
-            //int b = LoadedModManager.RunningMods.FirstIndexOf(x => x.PackageIdPlayerFacing == content.PackageIdPlayerFacing);
-            /*if (a != -1 && a < b)
-            {
-                APPIsLoadered = true;
-                //FashionOverrideComp.patchForAPP = new FashionOverrideComp.PatchForAPP();
-            }*/
         }
         public override void DoSettingsWindowContents(Rect inRect)
         {
@@ -36,6 +28,11 @@ namespace Fashion_Wardrobe
             ls.CheckboxLabeled("Default_EnableFashion".Translate(), ref FWSetting.DefaultEnableFashion);
             ls.CheckboxLabeled("Only_Colonist".Translate(), ref FWSetting.OnlyForColonist);
             ls.CheckboxLabeled("Show_InDoorFight".Translate(), ref FWSetting.ShowInDoorFight);
+            ls.CheckboxLabeled("Enable_MainButton".Translate(), ref FWSetting.EnableMainButton);
+            if (FWMainTabDefOf.Fashion != null)
+            {
+                FWMainTabDefOf.Fashion.buttonVisible = FWSetting.EnableMainButton;
+            }
             ls.End();
         }
         public override void WriteSettings()
@@ -69,12 +66,18 @@ namespace Fashion_Wardrobe
         internal static bool OnlyForColonist = true;
         internal static bool ShowInDoorFight = false;
         internal static bool DefaultEnableFashion = false;
+        internal static bool EnableMainButton = true;
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_Values.Look(ref OnlyForColonist, "OnlyForColonist", true, true);
             Scribe_Values.Look(ref ShowInDoorFight, "ShowInDoorFight", false, true);
             Scribe_Values.Look(ref DefaultEnableFashion, "DefaultEnableFashion", false, true);
+            Scribe_Values.Look(ref EnableMainButton, "EnableMainButton", true, true);
+            if (Scribe.mode == LoadSaveMode.LoadingVars && FWMainTabDefOf.Fashion != null)
+            {
+                FWMainTabDefOf.Fashion.buttonVisible = EnableMainButton;
+            }
         }
     }
 
@@ -90,8 +93,6 @@ namespace Fashion_Wardrobe
 
         private bool draft;
         private bool underRoof;
-
-        //internal static PatchForAPP patchForAPP = null;
         internal bool Draft
         {
             get { return draft; }
@@ -100,7 +101,6 @@ namespace Fashion_Wardrobe
                 if (draft != value)
                 {
                     draft = value;
-                    //Log.Warning("2");
                     draftValueChange = true;
                 }
             }
@@ -116,7 +116,6 @@ namespace Fashion_Wardrobe
                 if (underRoof != value)
                 {
                     underRoof = value;
-                    //Log.Warning("1");
                     UnderRoofChange = true;
 
                 }
@@ -325,19 +324,18 @@ namespace Fashion_Wardrobe
                 return comp.Clothes ?? new ThingOwner<Apparel>();
             }
         }
-        /*internal class PatchForAPP
-        {
-            public void GetGraphic(Pawn pawn, Apparel apparel, ref ApparelGraphicRecord apparelGraphicRecord)
-            {
-                MyApparelGraphicRecordGetter.TryGetGraphicApparelR1(MyApparelGraphicRecordGetter.GetDef(pawn.def.defName, pawn.story.bodyType, apparel), apparel, ref apparelGraphicRecord);
-            }
-        }*/
     }
-    internal static class FW_Windows
+    public static class FW_Windows
     {
         private static Color WindowBGBorderColor = new ColorInt(97, 108, 122).ToColor;
         private static Color WindowBGFillColor = new ColorInt(43, 44, 45).ToColor;
         private static List<Color> colors = new List<Color>();
+        private static readonly PawnApparelSettingWindow apparel_window = new PawnApparelSettingWindow();
+        private static readonly GUIStyle MidStyle = new GUIStyle(Text.CurFontStyle)
+        {
+            alignment = TextAnchor.MiddleLeft
+        };
+
         static FW_Windows()
         {
             colors = (from c in DefDatabase<ColorDef>.AllDefsListForReading
@@ -537,12 +535,12 @@ namespace Fashion_Wardrobe
                         bool d = false;
                         Apparel apparel = apparels[x];
                         Widgets.ThingIcon(iconLoc, apparel);
-                        if (drawRemove&& apparel.GetComp<CompColorable>()!=null)
+                        if (drawRemove && apparel.GetComp<CompColorable>() != null)
                         {
                             if (Mouse.IsOver(iconLoc))
                             {
                                 Widgets.DrawHighlight(iconLoc);
-                                TooltipHandler.TipRegion(iconLoc,"Choose".Translate()+" "+"Color".Translate());
+                                TooltipHandler.TipRegion(iconLoc, "Choose".Translate() + " " + "Color".Translate());
                             }
                             if (Widgets.ButtonInvisible(iconLoc))
                             {
@@ -550,9 +548,9 @@ namespace Fashion_Wardrobe
                                 for (int i = 0; i < colors.Count; i++)
                                 {
                                     Color col = colors[i];
-                                    colorSel.Add(new FloatMenuOption(" ", () => apparel.SetColor(col),extraPartWidth:30f, extraPartOnGUI: delegate (Rect floatM)
+                                    colorSel.Add(new FloatMenuOption(" ", () => apparel.SetColor(col), extraPartWidth: 30f, extraPartOnGUI: delegate (Rect floatM)
                                     {
-                                        Widgets.DrawBoxSolid(floatM,col);
+                                        Widgets.DrawBoxSolid(floatM, col);
                                         return false;
                                     }));
                                 }
@@ -634,7 +632,7 @@ namespace Fashion_Wardrobe
                 draggable = true;
                 forcePause = false;
                 closeOnClickedOutside = true;
-                AllapparelDef = DefDatabase<ThingDef>.AllDefs.Where(a => a.IsApparel && !a.apparel.wornGraphicPath.NullOrEmpty()).ToList();
+                AllapparelDef = DefDatabase<ThingDef>.AllDefs.Where(a => a.IsApparel).ToList();
             }
 
             public override void DoWindowContents(Rect inRect)
@@ -809,10 +807,93 @@ namespace Fashion_Wardrobe
             }
 
         }
+        public class MainTabWindow_Fashion : MainTabWindow
+        {
+            private float unitHight = 30f;
+            private List<Pawn> pawns = new List<Pawn>();
+            public override Vector2 RequestedTabSize
+            {
+                get
+                {
+                    int a;
+                    if (Current.Game != null && Current.Game.CurrentMap != null)
+                    {
+                        pawns = Current.Game.CurrentMap.mapPawns.AllPawnsSpawned.Where(o => FWUtility.FWork(o)).ToList();
+                    }
+                    if (pawns.NullOrEmpty())
+                    {
+                        a = 1;
+                    }
+                    else
+                    {
+                        a = pawns.Count + 1;
+                    }
+                    return new Vector2(1010f, a * (unitHight + 5f) + 40f);
+                }
+            }
+            public override void DoWindowContents(Rect inRect)
+            {
+                GameFont font = Text.Font;
+                Text.Font = GameFont.Medium;
+                string edit = "Edit".Translate();
+                Rect rect0 = new Rect(inRect.x, inRect.y, inRect.width, unitHight);
+                Widgets.Label(rect0, "Fashion_Wardrobe".Translate());
+                rect0.y += unitHight + 5f;
+                if (pawns.NullOrEmpty())
+                {
+                    Text.Font = font;
+                    return;
+                }
+                Text.Font = GameFont.Small;
+                string checkeStr = "FashionClothes_Enable".Translate();
+                Vector2 checkSize = Text.CalcSize(checkeStr);
+                for (int i = 0; i < pawns.Count; i++)
+                {
+                    Pawn pawn = pawns[i];
+                    GUI.Label(rect0, pawn.Name.ToStringFull, MidStyle);
+                    Vector2 size = Text.CalcSize(pawn.Name.ToStringFull);
+                    Widgets.DrawLineHorizontal(rect0.x + size.x + 20f, rect0.y + rect0.height / 2, 0.85f * rect0.width - size.x - 70f - checkSize.x);
+                    Rect rect1 = rect0.RightPart(0.15f);
+                    FashionOverrideComp comp = pawn.GetComp<FashionOverrideComp>();
+                    CheckboxLabeled(new Rect(rect1.x - checkSize.x - 45f, rect1.y, checkSize.x + 40f, rect1.height), checkeStr, ref comp.FashionClothesEnable, out bool click);
+                    if (click)
+                    {
+                        if (pawn.apparel != null)
+                        {
+                            pawn.apparel.Notify_ApparelChanged();
+                        }
+                    }
+                    if (Widgets.ButtonText(rect1, edit))
+                    {
+                        if (!apparel_window.IsOpen)
+                        {
+                            apparel_window.pawn = pawn;
+                            Find.WindowStack.Add(apparel_window);
+                        }
+                    }
+                    rect0.y += unitHight + 5f;
+                }
+                Text.Font = font;
+            }
+        }
     }
 
     public static class FWUtility
     {
+
+        public static bool FWork(Pawn pawn)
+        {
+            if (pawn.GetComp<FashionOverrideComp>() == null || pawn.apparel == null)
+            {
+                return false;
+            }
+            if (FWSetting.OnlyForColonist && (!pawn.IsColonist))
+            {
+                return false;
+            }
+            return true;
+        }
+
         public static Apparel NewApparel(ThingDef def)
         {
             if (def == null)
@@ -832,7 +913,6 @@ namespace Fashion_Wardrobe
     [StaticConstructorOnStartup]
     public static class HarmonyPatchA8
     {
-        private static readonly FW_Windows.PawnApparelSettingWindow apparel_window = new FW_Windows.PawnApparelSettingWindow();
         internal static MethodInfo getPawn = null;
         internal static Type RPGInvType = null;
         private static readonly Type patch = typeof(HarmonyPatchA8);
@@ -840,7 +920,7 @@ namespace Fashion_Wardrobe
         static HarmonyPatchA8()
         {
             Harmony harmony = new Harmony("aedbia.fashionwardrobe");
-            RPGInvType = AccessTools.TypeByName("Sandy_Detailed_RPG_Inventory.Sandy_Detailed_RPG_GearTab");
+            /*RPGInvType = AccessTools.TypeByName("Sandy_Detailed_RPG_Inventory.Sandy_Detailed_RPG_GearTab");
             if (RPGInvType == null)
             {
                 getPawn = AccessTools.PropertyGetter(typeof(ITab_Pawn_Gear), "SelPawnForGear");
@@ -851,7 +931,7 @@ namespace Fashion_Wardrobe
                 getPawn = AccessTools.PropertyGetter(RPGInvType, "SelPawnForGear");
                 harmony.Patch(AccessTools.Method(RPGInvType, "FillTab"), transpiler: new HarmonyMethod(patch, nameof(HarmonyPatchA8.TranFillTab)));
 
-            }
+            }*/
             MethodInfo setupApparel = AccessTools.Method(renderTree, "SetupApparelNodes");
             if (setupApparel != null)
             {
@@ -899,7 +979,7 @@ namespace Fashion_Wardrobe
             return holder is FashionOverrideComp.ApparelHolder ? (holder as FashionOverrideComp.ApparelHolder).comp.parent as Pawn : null;
         }
 
-        public static IEnumerable<CodeInstruction> TranFillTab(IEnumerable<CodeInstruction> codes)
+        /*public static IEnumerable<CodeInstruction> TranFillTab(IEnumerable<CodeInstruction> codes)
         {
             MethodInfo method = AccessTools.Method(typeof(HarmonyPatchA8), nameof(FillTab_1));
             MethodInfo method1 = AccessTools.Method(typeof(Widgets), nameof(Widgets.CheckboxLabeled));
@@ -954,7 +1034,7 @@ namespace Fashion_Wardrobe
                     }
                 }
             }
-        }
+        }*/
         public static IEnumerable<CodeInstruction> TranSetupApparelNodes(IEnumerable<CodeInstruction> codes)
         {
             MethodInfo wornApparelCount = AccessTools.PropertyGetter(typeof(Pawn_ApparelTracker), nameof(Pawn_ApparelTracker.WornApparelCount));
@@ -984,7 +1064,7 @@ namespace Fashion_Wardrobe
         }
         public static int GetDisplayApparelCount(Pawn_ApparelTracker pawn_Apparel)
         {
-            if (pawn_Apparel.pawn != null && FWork(pawn_Apparel.pawn))
+            if (pawn_Apparel.pawn != null && FWUtility.FWork(pawn_Apparel.pawn))
             {
                 FashionOverrideComp comp = pawn_Apparel.pawn.GetComp<FashionOverrideComp>();
                 return comp.GetApparel().Count;
@@ -1011,26 +1091,21 @@ namespace Fashion_Wardrobe
                 }
             }
         }
-        public static bool FWork(Pawn pawn)
-        {
-            if (pawn.GetComp<FashionOverrideComp>() == null || pawn.apparel == null)
-            {
-                return false;
-            }
-            if (FWSetting.OnlyForColonist && (!pawn.IsColonist))
-            {
-                return false;
-            }
-            return true;
-        }
+
         private static List<Apparel> GetFWApparel(List<Apparel> origin, Pawn pawn)
         {
-            if (pawn != null && FWork(pawn))
+            if (pawn != null && FWUtility.FWork(pawn))
             {
                 FashionOverrideComp comp = pawn.GetComp<FashionOverrideComp>();
                 return comp.GetApparel();
             }
             return origin;
         }
+
+    }
+    [DefOf]
+    public static class FWMainTabDefOf
+    {
+        public static MainButtonDef Fashion;
     }
 }
