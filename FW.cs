@@ -32,7 +32,12 @@ namespace Fashion_Wardrobe
             ls.CheckboxLabeled("Only_Colonist".Translate(), ref FWSetting.OnlyForColonist);
             ls.CheckboxLabeled("Show_InDoorFight".Translate(), ref FWSetting.ShowInDoorFight);
             ls.CheckboxLabeled("Enable_MainButton".Translate(), ref FWSetting.EnableMainButton);
-            ls.CheckboxLabeled("Enable_Preview".Translate(), ref FWSetting.EnablePreview);
+            ls.CheckboxLabeled("Direct_Open_FW".Translate(), ref FWSetting.Direct_Open_FW);
+            if (!FWSetting.Direct_Open_FW)
+            {
+                ls.CheckboxLabeled("Enable_Preview".Translate(), ref FWSetting.EnablePreview);
+            }
+
             if (FWMainTabDefOf.FW_FashionTab != null && FWMainTabDefOf.FW_FashionTab.hotKey != null)
             {
                 if (keyPrefsData == null)
@@ -43,7 +48,6 @@ namespace Fashion_Wardrobe
                 BindingSlot slot = BindingSlot.A;
                 if (ls.ButtonTextLabeled("Set_key".Translate(), keyPrefsData.GetBoundKeyCode(keyDef, slot).ToStringReadable()))
                 {
-
                     if (Event.current.button == 0)
                     {
                         if (Dialog_DefineBinding == null)
@@ -126,6 +130,7 @@ namespace Fashion_Wardrobe
         internal static bool EnableMainButton = true;
         internal static List<PresetData> PresetDatas = new List<PresetData>();
         internal static bool EnablePreview = true;
+        internal static bool Direct_Open_FW = false;
         public override void ExposeData()
         {
             base.ExposeData();
@@ -133,6 +138,7 @@ namespace Fashion_Wardrobe
             Scribe_Values.Look(ref ShowInDoorFight, "ShowInDoorFight", false, true);
             Scribe_Values.Look(ref DefaultEnableFashion, "DefaultEnableFashion", false, true);
             Scribe_Values.Look(ref EnableMainButton, "EnableMainButton", true, true);
+            Scribe_Values.Look(ref EnableMainButton, "Direct_Open_FW", true, false);
             Scribe_Values.Look(ref EnablePreview, "EnablePreview", true, true);
             Scribe_Collections.Look(ref PresetDatas, "PresetDatas", LookMode.Deep);
             if (PresetDatas == null)
@@ -442,6 +448,23 @@ namespace Fashion_Wardrobe
                     return FWSetting.EnableMainButton;
                 }
             }
+
+            public override void Activate()
+            {
+                if (FWSetting.Direct_Open_FW)
+                {
+                    Pawn pawn = Find.Selector?.SelectedPawns.FirstOrDefault();
+                    if (pawn != null && FWUtility.FWork(pawn) && !FW_Windows.apparel_window.IsOpen)
+                    {
+                        FW_Windows.apparel_window.pawn = pawn;
+                        Find.WindowStack.Add(FW_Windows.apparel_window);
+                    }
+                }
+                else
+                {
+                    base.Activate();
+                };
+            }
         }
     }
 
@@ -450,7 +473,7 @@ namespace Fashion_Wardrobe
         private static readonly Color WindowBGBorderColor = new ColorInt(97, 108, 122).ToColor;
         private static readonly Color WindowBGFillColor = new ColorInt(43, 44, 45).ToColor;
         private static readonly List<Color> colors;
-        private static readonly PawnApparelSettingWindow apparel_window = new PawnApparelSettingWindow();
+        internal static readonly PawnApparelSettingWindow apparel_window = new PawnApparelSettingWindow();
         private static readonly List<ThingDef> AllapparelDef = DefDatabase<ThingDef>.AllDefs.Where(a => a.IsApparel).ToList();
         private static readonly GUIStyle MidLStyle = new GUIStyle(Text.fontStyles[1])
 
@@ -476,6 +499,35 @@ namespace Fashion_Wardrobe
         }
         private static Action<Color> setColor;
         private static FloatMenuGrid colorSelect;
+
+        private static FWSetting.PresetData selPreset;
+        private static FloatMenu floatMenu;
+        private static readonly PresetManagerWindow presetManager = new PresetManagerWindow();
+
+        private static void CreateFloatMenu()
+        {
+            List<FloatMenuOption> options = new List<FloatMenuOption>();
+            if (!FWSetting.PresetDatas.NullOrEmpty())
+            {
+                for (int i = 0; i < FWSetting.PresetDatas.Count; i++)
+                {
+                    FWSetting.PresetData data = FWSetting.PresetDatas[i];
+                    if (data != null)
+                    {
+                        FloatMenuOption option = new FloatMenuOption("Apply".Translate() + " " + data.Id, () => selPreset = data);
+                        options.Add(option);
+                    }
+                }
+                if (options.Count > 0)
+                {
+                    floatMenu = new FloatMenu(options);
+                }
+            }
+            else
+            {
+                floatMenu = null;
+            }
+        }
 
         private static void CreateColorFloatSel()
         {
@@ -606,8 +658,23 @@ namespace Fashion_Wardrobe
                 closeOnClickedOutside = true;
             }
 
+            public void CheckPawn()
+            {
+                Pawn selPawn = Find.Selector?.SelectedPawns.FirstOrDefault();
+                if (FWUtility.FWork(selPawn) && pawn != selPawn)
+                {
+                    pawn = selPawn;
+                }
+            }
+            public override void PreOpen()
+            {
+                base.PreOpen();
+                CreateFloatMenu();
+            }
+
             public override void DoWindowContents(Rect inRect)
             {
+                CheckPawn();
                 float a = 0.05f;
                 Rect label0 = inRect.TopPart(a);
                 Rect contectRect = inRect.BottomPart(1 - a);
@@ -691,17 +758,29 @@ namespace Fashion_Wardrobe
                                 pawn.apparel.Notify_ApparelChanged();
                             }
                         }
-
-                        if (Widgets.ButtonText(rect2.BottomPart(0.05f).RightHalf(), "Add".Translate()))
+                        Rect rect3 = rect2.BottomPart(0.05f).RightHalf();
+                        if (Widgets.ButtonText(rect3.LeftHalf(), "Preset".Translate()))
                         {
-                            if (SelApparelWindow == null)
+                            if (floatMenu != null)
                             {
-                                SelApparelWindow = new SelApparelWindow();
+                                Find.WindowStack.Add(floatMenu);
                             }
-                            if (!SelApparelWindow.IsOpen)
+                        }
+                        if (selPreset != null)
+                        {
+                            FashionOverrideComp comp1 = pawn.TryGetComp<FashionOverrideComp>();
+                            if (comp1 != null && pawn.apparel != null)
                             {
-                                SelApparelWindow.pawn = pawn;
-                                Find.WindowStack.Add(SelApparelWindow);
+                                comp1.ApplyPreset(selPreset);
+                                pawn.apparel.Notify_ApparelChanged();
+                            }
+                            selPreset = null;
+                        }
+                        if (Widgets.ButtonText(rect3.RightHalf(), "Manage".Translate()))
+                        {
+                            if (!presetManager.IsOpen)
+                            {
+                                Find.WindowStack.Add(presetManager);
                             }
                         }
                     }
@@ -718,11 +797,14 @@ namespace Fashion_Wardrobe
                     apparels = new List<Apparel>(comp.Clothes);
                 }
                 comp.SortCloths(ref apparels);
+                float height = 120f * apparels.Count + (drawRemove ? 60f : 0);
+                bool a0 = height > inRect.height;
+                Rect view = new Rect(0, 0, inRect.width - (a0?16f:0), height);
+                Widgets.BeginScrollView(inRect, ref scrollPosition, view);
+                Rect iconLoc = new Rect(0, 0, 60f, 60f);
                 if (!apparels.NullOrEmpty())
                 {
-                    Rect view = new Rect(0, 0, inRect.width - 20f, 120f * apparels.Count);
-                    Widgets.BeginScrollView(inRect, ref scrollPosition, view);
-                    Rect iconLoc = new Rect(0, 0, 60f, 60f);
+
                     Rect butLoc = new Rect(4f, 80f, 52f, 20f);
                     Rect LabelLoc = new Rect(60f, 0, view.width - 60f, 20f);
                     Rect checkLoc = new Rect(60f, 20f, LabelLoc.width, 30f);
@@ -775,8 +857,31 @@ namespace Fashion_Wardrobe
                             active = true;
                         }
                     }
-                    Widgets.EndScrollView();
                 }
+                if (drawRemove)
+                {
+                    Rect rect0 = new Rect(iconLoc.x + 4f, iconLoc.y + 4f, view.width - 8f, 52f);
+                    Rect addIcon = new Rect(rect0.x,rect0.y,52f,52f); 
+                    Rect addLoc = new Rect(rect0.x+56f, rect0.y, rect0.width -56f, 52f);
+                    Widgets.DrawBoxSolidWithOutline(rect0, Color.grey,Color.white);
+                    GUI.DrawTexture(addIcon, TexButton.Add);
+                    GUI.Label(addLoc, "Add".Translate(), MidCStyle);
+                    Widgets.DrawHighlightIfMouseover(rect0);
+                    if (Widgets.ButtonInvisible(rect0))
+                    {
+                        if (SelApparelWindow == null)
+                        {
+                            SelApparelWindow = new SelApparelWindow();
+                        }
+                        if (!SelApparelWindow.IsOpen)
+                        {
+                            SelApparelWindow.pawn = pawn;
+                            Find.WindowStack.Add(SelApparelWindow);
+                        }
+                    }
+
+                }
+                Widgets.EndScrollView();
                 return active;
             }
 
@@ -1251,7 +1356,7 @@ namespace Fashion_Wardrobe
                                 FWSetting.PresetDatas.Remove(data);
                                 if (FashionWindow != null)
                                 {
-                                    FashionWindow.CreateFloatMenu();
+                                    CreateFloatMenu();
                                 }
                             }
                             laLoc0.y += uH + 5f;
@@ -1306,7 +1411,7 @@ namespace Fashion_Wardrobe
                             FWSetting.PresetDatas.Add(new FWSetting.PresetData(addName));
                             if (FashionWindow != null)
                             {
-                                FashionWindow.CreateFloatMenu();
+                                CreateFloatMenu();
                             }
                             addPreset = false;
                             addName = "";
@@ -1320,10 +1425,7 @@ namespace Fashion_Wardrobe
         {
             private float unitHight = 30f;
             private List<Pawn> pawns = new List<Pawn>();
-            private FWSetting.PresetData selPreset;
             private Pawn selPawn;
-            private FloatMenu floatMenu;
-            private readonly PresetManagerWindow presetManager = new PresetManagerWindow();
 
             public override Vector2 RequestedTabSize
             {
@@ -1350,32 +1452,6 @@ namespace Fashion_Wardrobe
             {
                 presetManager.FashionWindow = this;
             }
-
-            public void CreateFloatMenu()
-            {
-                List<FloatMenuOption> options = new List<FloatMenuOption>();
-                if (!FWSetting.PresetDatas.NullOrEmpty())
-                {
-                    for (int i = 0; i < FWSetting.PresetDatas.Count; i++)
-                    {
-                        FWSetting.PresetData data = FWSetting.PresetDatas[i];
-                        if (data != null)
-                        {
-                            FloatMenuOption option = new FloatMenuOption("Apply".Translate() + " " + data.Id, () => selPreset = data);
-                            options.Add(option);
-                        }
-                    }
-                    if (options.Count > 0)
-                    {
-                        floatMenu = new FloatMenu(options);
-                    }
-                }
-                else
-                {
-                    floatMenu = null;
-                }
-            }
-
             private Vector2 scr = Vector2.zero;
             private KeyValuePair<Pawn, RenderTexture> pawnTexture = new KeyValuePair<Pawn, RenderTexture>();
             private Vector2 pawnTextureSize = new Vector2(100, 100);
@@ -1503,6 +1579,10 @@ namespace Fashion_Wardrobe
 
         public static bool FWork(Pawn pawn)
         {
+            if (pawn == null)
+            {
+                return false;
+            }
             if (pawn.GetComp<FashionOverrideComp>() == null || pawn.apparel == null)
             {
                 return false;
