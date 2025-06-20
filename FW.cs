@@ -138,7 +138,7 @@ namespace Fashion_Wardrobe
             Scribe_Values.Look(ref ShowInDoorFight, "ShowInDoorFight", false, true);
             Scribe_Values.Look(ref DefaultEnableFashion, "DefaultEnableFashion", false, true);
             Scribe_Values.Look(ref EnableMainButton, "EnableMainButton", true, true);
-            Scribe_Values.Look(ref EnableMainButton, "Direct_Open_FW", true, false);
+            Scribe_Values.Look(ref Direct_Open_FW, "Direct_Open_FW", false, true);
             Scribe_Values.Look(ref EnablePreview, "EnablePreview", true, true);
             Scribe_Collections.Look(ref PresetDatas, "PresetDatas", LookMode.Deep);
             if (PresetDatas == null)
@@ -1738,6 +1738,7 @@ namespace Fashion_Wardrobe
         }
 
     }
+
     [DefOf]
     public static class FWMainTabDefOf
     {
