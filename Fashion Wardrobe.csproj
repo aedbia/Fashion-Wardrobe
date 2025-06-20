@@ -18,7 +18,7 @@
     <DebugSymbols>false</DebugSymbols>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>E:\SteamLibrary\steamapps\common\RimWorld\Mods\Fashion Wardrobe\1.5\Assemblies\</OutputPath>
+    <OutputPath>E:\SteamLibrary\steamapps\common\RimWorld\Mods\Fashion Wardrobe\1.6\Assemblies\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>none</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -36,6 +36,9 @@
     <Reference Include="0Harmony">
       <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2009463077\Current\Assemblies\0Harmony.dll</HintPath>
       <Private>False</Private>
+    </Reference>
+    <Reference Include="ABEasyLib">
+      <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\Mods\ApparelTweakerLib\1.6\Assemblies\ABEasyLib.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>

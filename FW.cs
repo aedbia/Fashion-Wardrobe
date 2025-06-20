@@ -180,7 +180,7 @@ namespace Fashion_Wardrobe
         internal ThingOwner<Apparel> Clothes;
         internal List<Apparel> FashionApparel = new List<Apparel>();
         internal Dictionary<string, FWCompData> DrawRule = new Dictionary<string, FWCompData>();
-
+        private List<Apparel> postAdds = new List<Apparel>();
         private bool draft;
         private bool underRoof;
         internal bool Draft
@@ -263,7 +263,7 @@ namespace Fashion_Wardrobe
             Draft = Pawn.Drafted;
             if (!FWSetting.OnlyForColonist || Pawn.IsColonist)
             {
-                if (Pawn.Map != null && Pawn.Position != null)
+                if (Pawn.Map != null)
                 {
                     UnderRoof = !Pawn.Position.UsesOutdoorTemperature(Pawn.Map);
                 }
@@ -333,6 +333,7 @@ namespace Fashion_Wardrobe
                 }
             }
             RemoveNoDisplayGraphic(ref list1);
+            PostGetApparel(ref list1);
             if (flag)
             {
                 SortCloths(ref list1);
@@ -344,7 +345,46 @@ namespace Fashion_Wardrobe
         {
             apparels.Sort((Apparel a, Apparel b) => a.def.apparel.LastLayer.drawOrder.CompareTo(b.def.apparel.LastLayer.drawOrder));
         }
+        private void PostGetApparel(ref List<Apparel> list)
+        {
+            if (!postAdds.NullOrEmpty())
+            {
+                foreach (Apparel ap in postAdds)
+                {
+                    if (!list.Contains(ap))
+                    {
+                        list.Add(ap);
+                    }
+                }
+            }
 
+        }
+        public void AddOrRemovePostList(Apparel apparel, bool add)
+        {
+            if (postAdds == null)
+            {
+                postAdds = new List<Apparel>();
+            }
+            if (postAdds.Count == 0)
+            {
+                if (add)
+                {
+                    postAdds.Add(apparel);
+                }
+
+            }
+            else
+            {
+                if (add && !postAdds.Contains(apparel))
+                {
+                    postAdds.Add(apparel);
+                }
+                else if (!add && postAdds.Contains(apparel))
+                {
+                    postAdds.Remove(apparel);
+                }
+            }
+        }
         public void RemoveNoDisplayGraphic(ref List<Apparel> apparels)
         {
             apparels.RemoveAll(a =>
@@ -372,7 +412,7 @@ namespace Fashion_Wardrobe
                             }
                         }
 
-                        if (data.HideInDoor && Pawn.Map != null && Pawn.Position != null && !Pawn.Position.UsesOutdoorTemperature(Pawn.Map))
+                        if (data.HideInDoor && Pawn.Map != null && !Pawn.Position.UsesOutdoorTemperature(Pawn.Map))
                         {
                             return true;
                         }
@@ -463,7 +503,8 @@ namespace Fashion_Wardrobe
                 else
                 {
                     base.Activate();
-                };
+                }
+                ;
             }
         }
     }
@@ -799,7 +840,7 @@ namespace Fashion_Wardrobe
                 comp.SortCloths(ref apparels);
                 float height = 120f * apparels.Count + (drawRemove ? 60f : 0);
                 bool a0 = height > inRect.height;
-                Rect view = new Rect(0, 0, inRect.width - (a0?16f:0), height);
+                Rect view = new Rect(0, 0, inRect.width - (a0 ? 16f : 0), height);
                 Widgets.BeginScrollView(inRect, ref scrollPosition, view);
                 Rect iconLoc = new Rect(0, 0, 60f, 60f);
                 if (!apparels.NullOrEmpty())
@@ -861,9 +902,9 @@ namespace Fashion_Wardrobe
                 if (drawRemove)
                 {
                     Rect rect0 = new Rect(iconLoc.x + 4f, iconLoc.y + 4f, view.width - 8f, 52f);
-                    Rect addIcon = new Rect(rect0.x,rect0.y,52f,52f); 
-                    Rect addLoc = new Rect(rect0.x+56f, rect0.y, rect0.width -56f, 52f);
-                    Widgets.DrawBoxSolidWithOutline(rect0, Color.grey,Color.white);
+                    Rect addIcon = new Rect(rect0.x, rect0.y, 52f, 52f);
+                    Rect addLoc = new Rect(rect0.x + 56f, rect0.y, rect0.width - 56f, 52f);
+                    Widgets.DrawBoxSolidWithOutline(rect0, Color.grey, Color.white);
                     GUI.DrawTexture(addIcon, TexButton.Add);
                     GUI.Label(addLoc, "Add".Translate(), MidCStyle);
                     Widgets.DrawHighlightIfMouseover(rect0);
@@ -1611,19 +1652,28 @@ namespace Fashion_Wardrobe
     }
 
     [StaticConstructorOnStartup]
-    public static class HarmonyPatchA8
+    public static class FWModHarmonyPatch
     {
         internal static MethodInfo getPawn = null;
         internal static Type RPGInvType = null;
-        private static readonly Type patch = typeof(HarmonyPatchA8);
+        private static readonly Type patch = typeof(FWModHarmonyPatch);
         private static readonly Type renderTree = typeof(PawnRenderTree);
-        static HarmonyPatchA8()
+        private static readonly Type renderSetup = typeof(DynamicPawnRenderNodeSetup_Apparel);
+        static FieldInfo nodeSetupPwan = null;
+        static FWModHarmonyPatch()
         {
             Harmony harmony = new Harmony("aedbia.fashionwardrobe");
-            MethodInfo setupApparel = AccessTools.Method(renderTree, "SetupApparelNodes");
-            if (setupApparel != null)
+            var flag = BindingFlags.Instance | BindingFlags.NonPublic;
+            Type type = renderSetup.GetNestedTypes(BindingFlags.NonPublic)?.Where(a => a.GetMethods(flag).Any(m => m.Name == "MoveNext") && a.Name.IndexOf("GetDynamicNodes") != -1 && a.Name.IndexOf("d__3") != -1).FirstOrDefault();
+            MethodInfo setupApparel = null;
+            if (type != null)
             {
-                harmony.Patch(setupApparel, transpiler: new HarmonyMethod(patch, nameof(TranSetupApparelNodes)));
+                setupApparel = type.GetMethod("MoveNext", flag);
+                nodeSetupPwan = type.GetField("pawn", flag);
+            }
+            if (setupApparel != null && nodeSetupPwan != null)
+            {
+                harmony.Patch(setupApparel, transpiler: new HarmonyMethod(patch, nameof(TranGetDynamicNodes)));
             }
             MethodInfo ApparelWearGetter = AccessTools.PropertyGetter(typeof(Apparel), "Wearer");
             if (ApparelWearGetter != null)
@@ -1642,7 +1692,7 @@ namespace Fashion_Wardrobe
 
         public static IEnumerable<CodeInstruction> TranWearerGetter(IEnumerable<CodeInstruction> codes)
         {
-            MethodInfo method = AccessTools.Method(typeof(HarmonyPatchA8), nameof(GetWearer));
+            MethodInfo method = AccessTools.Method(typeof(FWModHarmonyPatch), nameof(GetWearer));
             MethodInfo method0 = AccessTools.PropertyGetter(typeof(Thing), nameof(Thing.ParentHolder));
             List<CodeInstruction> list = codes.ToList();
             for (int i = 0; i < list.Count; i++)
@@ -1667,7 +1717,7 @@ namespace Fashion_Wardrobe
             return holder is FashionOverrideComp.ApparelHolder ? (holder as FashionOverrideComp.ApparelHolder).comp.parent as Pawn : null;
         }
 
-        public static IEnumerable<CodeInstruction> TranSetupApparelNodes(IEnumerable<CodeInstruction> codes)
+        public static IEnumerable<CodeInstruction> TranGetDynamicNodes(IEnumerable<CodeInstruction> codes)
         {
             MethodInfo wornApparelCount = AccessTools.PropertyGetter(typeof(Pawn_ApparelTracker), nameof(Pawn_ApparelTracker.WornApparelCount));
             MethodInfo wornApparel = AccessTools.PropertyGetter(typeof(Pawn_ApparelTracker), nameof(Pawn_ApparelTracker.WornApparel));
@@ -1685,7 +1735,7 @@ namespace Fashion_Wardrobe
                 {
                     yield return code;
                     yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(renderTree, nameof(PawnRenderTree.pawn)));
+                    yield return new CodeInstruction(OpCodes.Ldfld, nodeSetupPwan);
                     yield return new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(patch, nameof(GetFWApparel)));
                 }
                 else
