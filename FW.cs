@@ -1,4 +1,5 @@
-﻿using ABEasyLib.ABExtensions;
+﻿using ABEasyLib;
+using ABEasyLib.ABExtensions;
 using HarmonyLib;
 using RimWorld;
 using System;
@@ -187,16 +188,14 @@ namespace Fashion_Wardrobe
 
     public class FashionOverrideComp : ThingComp
     {
-        private Pawn Pawn => (parent as Pawn);
+        private Pawn pawn => (parent as Pawn);
 
         internal bool FashionClothesEnable;
         internal ThingOwner<Apparel> Clothes;
-        internal List<Apparel> FashionApparel = new List<Apparel>();
         internal Dictionary<string, FWCompData> DrawRule = new Dictionary<string, FWCompData>();
-        private List<Apparel> postAdds = new List<Apparel>();
         private bool draft;
         private bool underRoof;
-
+        private PawnTextureCache textureCache;
         internal bool Draft
         {
             get { return draft; }
@@ -273,18 +272,18 @@ namespace Fashion_Wardrobe
         public override void CompTick()
         {
             base.CompTick();
-            Draft = Pawn.Drafted;
-            if (!FWSetting.OnlyForColonist || Pawn.IsColonist)
+            Draft = pawn.Drafted;
+            if (!FWSetting.OnlyForColonist || pawn.IsColonist)
             {
-                if (Pawn.Map != null)
+                if (pawn.Map != null)
                 {
-                    UnderRoof = !Pawn.Position.UsesOutdoorTemperature(Pawn.Map);
+                    UnderRoof = !pawn.Position.UsesOutdoorTemperature(pawn.Map);
                 }
                 if (draftValueChange || UnderRoofChange)
                 {
-                    if (FWMod.HATWeakerLoadrIndex == -1 && Pawn.apparel != null)
+                    if (FWMod.HATWeakerLoadrIndex == -1 && pawn.apparel != null)
                     {
-                        Pawn.apparel.Notify_ApparelChanged();
+                        pawn.apparel.Notify_ApparelChanged();
                     }
                     draftValueChange = false;
                     UnderRoofChange = false;
@@ -300,7 +299,7 @@ namespace Fashion_Wardrobe
             }
             if (apparel != null && !Clothes.Contains(apparel))
             {
-                Clothes.RemoveAll(a => !ApparelUtility.CanWearTogether(a.def, apparel.def, Pawn.RaceProps.body));
+                Clothes.RemoveAll(a => !ApparelUtility.CanWearTogether(a.def, apparel.def, pawn.RaceProps.body));
                 if (removeHolder)
                 {
                     Apparel apparel1 = FWUtility.NewApparel(apparel.def);
@@ -318,6 +317,21 @@ namespace Fashion_Wardrobe
         public List<Apparel> GetApparel()
         {
             List<Apparel> list0;
+            try
+            {
+                if (textureCache == null)
+                {
+                    if (PawnTextureCache.GetPawnTextureCache(pawn, out var a))
+                    {
+                        textureCache = a;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce(e.ToString(),GetHashCode());
+            }
+            bool hasCache = textureCache != null;
             if (Clothes.Count != 0 && FashionClothesEnable)
             {
                 list0 = new List<Apparel>(Clothes);
@@ -328,12 +342,19 @@ namespace Fashion_Wardrobe
             }
             bool flag = !list0.NullOrEmpty();
             List<Apparel> list1;
-            if (!Pawn.apparel.WornApparel.NullOrEmpty())
+            if (!pawn.apparel.WornApparel.NullOrEmpty())
             {
-                list1 = new List<Apparel>(Pawn.apparel.WornApparel);
+                list1 = new List<Apparel>(pawn.apparel.WornApparel);
                 if (flag)
                 {
-                    list1.RemoveAll(a => a.def.apparel.layers.Any(b => list0.Any(c => c.def.apparel.layers.Contains(b))));
+                    list1.RemoveAll(a => a.def.apparel.layers.Any(b =>
+                    {
+                        if (hasCache && textureCache.postApparels.Contains(a))
+                        {
+                            return false;
+                        }
+                        return list0.Any(c => c.def.apparel.layers.Contains(b));
+                    }));
                     list1.AddRange(list0);
                 }
             }
@@ -346,10 +367,18 @@ namespace Fashion_Wardrobe
                 }
             }
             RemoveNoDisplayGraphic(ref list1);
-            PostGetApparel(ref list1);
+            if (hasCache && !textureCache.postApparels.NullOrEmpty())
+            {
+                list1.AddRange(textureCache.postApparels);
+            }
             if (flag)
             {
                 SortCloths(ref list1);
+            }
+
+            if (hasCache)
+            {
+                textureCache.OverrideApparels = list1;
             }
             return list1;
         }
@@ -358,47 +387,6 @@ namespace Fashion_Wardrobe
         {
             apparels.Sort((Apparel a, Apparel b) => a.def.apparel.LastLayer.drawOrder.CompareTo(b.def.apparel.LastLayer.drawOrder));
         }
-
-        private void PostGetApparel(ref List<Apparel> list)
-        {
-            if (!postAdds.NullOrEmpty())
-            {
-                foreach (Apparel ap in postAdds)
-                {
-                    if (!list.Contains(ap))
-                    {
-                        list.Add(ap);
-                    }
-                }
-            }
-        }
-
-        public void AddOrRemovePostList(Apparel apparel, bool add)
-        {
-            if (postAdds == null)
-            {
-                postAdds = new List<Apparel>();
-            }
-            if (postAdds.Count == 0)
-            {
-                if (add)
-                {
-                    postAdds.Add(apparel);
-                }
-            }
-            else
-            {
-                if (add && !postAdds.Contains(apparel))
-                {
-                    postAdds.Add(apparel);
-                }
-                else if (!add && postAdds.Contains(apparel))
-                {
-                    postAdds.Remove(apparel);
-                }
-            }
-        }
-
         public void RemoveNoDisplayGraphic(ref List<Apparel> apparels)
         {
             apparels.RemoveAll(a =>
@@ -411,7 +399,7 @@ namespace Fashion_Wardrobe
                         {
                             return true;
                         }
-                        if (!Pawn.Drafted)
+                        if (!pawn.Drafted)
                         {
                             if (data.HideNoFight)
                             {
@@ -426,7 +414,7 @@ namespace Fashion_Wardrobe
                             }
                         }
 
-                        if (data.HideInDoor && Pawn.Map != null && !Pawn.Position.UsesOutdoorTemperature(Pawn.Map))
+                        if (data.HideInDoor && pawn.Map != null && !pawn.Position.UsesOutdoorTemperature(pawn.Map))
                         {
                             return true;
                         }
@@ -989,6 +977,7 @@ namespace Fashion_Wardrobe
             private ThingStyleDef thingStyleDef = null;
             private bool fliterByLayer = true;
             private ApparelLayerDef layerDef;
+            private List<FloatMenuOption> Options = new List<FloatMenuOption>();
             public SelApparelWindow()
             {
                 doCloseButton = true;
@@ -1012,14 +1001,19 @@ namespace Fashion_Wardrobe
                 string fliterStr = layerDef?.label ?? allTitle;
                 if (Widgets.ButtonText(new Rect(rect0.x, rect0.y, rect0.width * 0.2f + 1f, 30f), fliterStr))
                 {
-                    List<FloatMenuOption> Options = new List<FloatMenuOption>();
                     var layers = DefDatabase<ApparelLayerDef>.AllDefsListForReading;
-                    for (int i = 0; i < layers.Count; i++)
+                    if (Options.NullOrEmpty())
                     {
-                        ApparelLayerDef layerDef = layers[i];
-                        Options.Add(new FloatMenuOption(layerDef.label, () => { this.layerDef = layerDef; fliterByLayer = true; }));
+                        for (int i = 0; i < layers.Count; i++)
+                        {
+                            ApparelLayerDef layerDef0 = layers[i];
+                            if (AllapparelDef.Any(a => a.apparel.layers.Contains(layerDef0)))
+                            {
+                                Options.Add(new FloatMenuOption(layerDef0.label, () => { this.layerDef = layerDef0; fliterByLayer = true; }));
+                            }
+                        }
+                        Options.Add(new FloatMenuOption(allTitle, () => { layerDef = null; fliterByLayer = true; }));
                     }
-                    Options.Add(new FloatMenuOption(allTitle, () => { layerDef = null; fliterByLayer = true; }));
                     Find.WindowStack.Add(new FloatMenu(Options));
                 }
                 if (filteredApparels.NullOrEmpty())
@@ -1175,12 +1169,13 @@ namespace Fashion_Wardrobe
                 filteredApparels = new List<ThingDef>();
                 reFilter = true;
                 QuickSearch.filter.Text = "";
+                Options = new List<FloatMenuOption>();
             }
         }
 
         public class PresetManagerWindow : Window
         {
-            private int unitCount = 20;
+            private readonly int unitCount = 20;
             private FWSetting.PresetData selPreset;
             public MainTabWindow_Fashion FashionWindow;
             private readonly Color color1;
