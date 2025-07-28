@@ -329,7 +329,7 @@ namespace Fashion_Wardrobe
             }
             catch (Exception e)
             {
-                Log.ErrorOnce(e.ToString(),GetHashCode());
+                Log.ErrorOnce(e.ToString(), GetHashCode());
             }
             bool hasCache = textureCache != null;
             if (Clothes.Count != 0 && FashionClothesEnable)
@@ -351,7 +351,7 @@ namespace Fashion_Wardrobe
                     {
                         if (hasCache && textureCache.postApparels.Contains(a))
                         {
-                            return false;
+                           return false;
                         }
                         return list0.Any(c => c.def.apparel.layers.Contains(b));
                     }));
@@ -367,15 +367,10 @@ namespace Fashion_Wardrobe
                 }
             }
             RemoveNoDisplayGraphic(ref list1);
-            if (hasCache && !textureCache.postApparels.NullOrEmpty())
-            {
-                list1.AddRange(textureCache.postApparels);
-            }
             if (flag)
             {
                 SortCloths(ref list1);
             }
-
             if (hasCache)
             {
                 textureCache.OverrideApparels = list1;
