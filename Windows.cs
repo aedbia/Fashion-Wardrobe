@@ -180,7 +180,7 @@ namespace Fashion_Wardrobe
                 Rect label0 = inRect.TopPart(a);
                 Rect contectRect = inRect.BottomPart(1 - a);
                 Widgets.Label(label0, "Fashion_Wardrobe".Translate());
-                Rect rect0 = new Rect(contectRect.x + contectRect.height * 2 * a + 4f, contectRect.y + contectRect.height * a +1f, contectRect.width - contectRect.height * 2 * a - 6f, contectRect.height * a+2f);
+                Rect rect0 = new Rect(contectRect.x + contectRect.height * 2 * a + 4f, contectRect.y + contectRect.height * a + 1f, contectRect.width - contectRect.height * 2 * a - 6f, contectRect.height * a + 2f);
                 Rect copyLoc = new Rect(contectRect.x, contectRect.y, contectRect.height * 2 * a, contectRect.height * a);
                 List<TabRecord> tabs = new List<TabRecord>
             {
@@ -198,8 +198,8 @@ namespace Fashion_Wardrobe
                 }, tabInt == 1)
             };
                 Rect rect1 = new Rect(contectRect.x, contectRect.y + contectRect.height * a, contectRect.width - 1f, contectRect.height * 0.89f);
-                
-                Widgets.DrawBoxSolidWithOutline(rect1, WindowBGFillColor,Widgets.SeparatorLineColor);
+
+                Widgets.DrawBoxSolidWithOutline(rect1, WindowBGFillColor, Widgets.SeparatorLineColor);
                 TabDrawer.DrawTabs(rect0, tabs);
                 GUI.color = Color.white;
                 Rect rect2 = new Rect(rect1.x + 3f, rect1.y + 8f, rect1.width - 6f, rect1.height - 16f);
@@ -233,7 +233,7 @@ namespace Fashion_Wardrobe
                                     }
                                     FWSetting.PresetDatas.Add(new FWPresetData(pawn.Name.ToStringSafe())
                                     {
-                                        apparels = apparels.ToDictionary(k => k.def.defName, d => new FWPresetApparelData(d.DrawColor,d.StyleDef?.defName??""))
+                                        apparels = apparels.ToDictionary(k => k.def.defName, d => CreatePresetFormApparel(d))
                                     });
                                     CreateFloatMenu();
                                     FWMod.setting.Write();
@@ -267,7 +267,7 @@ namespace Fashion_Wardrobe
                                     }
                                     FWSetting.PresetDatas.Add(new FWPresetData(pawn.Name.ToStringSafe())
                                     {
-                                        apparels = comp.Clothes.InnerListForReading.ToDictionary(k => k.def.defName, d => new FWPresetApparelData(d.DrawColor,d.StyleDef?.defName??""))
+                                        apparels = comp.Clothes.InnerListForReading.ToDictionary(k => k.def.defName, d => CreatePresetFormApparel(d))
                                     });
                                     CreateFloatMenu();
                                     FWMod.setting.Write();
@@ -297,14 +297,15 @@ namespace Fashion_Wardrobe
                                     pawn.apparel.Notify_ApparelChanged();
                                 });
                             }
-                        }else if (DrawScroll(rect2.TopPart(0.95f), comp))
+                        }
+                        else if (DrawScroll(rect2.TopPart(0.95f), comp))
                         {
                             pawn.apparel.Notify_ApparelChanged();
                         }
                         float height = rect2.height * 0.05f;
                         Rect sr = new Rect(rect2.x, rect2.y + rect2.height - height, height, height);
-                        
-                        if (cos&&Widgets.ButtonImage(sr, SettingTex))
+
+                        if (cos && Widgets.ButtonImage(sr, SettingTex))
                         {
                             Find.WindowStack.Add(new FloatMenu(new List<FloatMenuOption>()
                             {
@@ -315,7 +316,7 @@ namespace Fashion_Wardrobe
                                     {
                                         pawn.apparel.Notify_ApparelChanged();
                                     }
-                                },extraPartWidth:20f,extraPartOnGUI: r =>
+                                },extraPartWidth:24f,extraPartOnGUI: r =>
                                 {
                                     Widgets.CheckboxDraw(r.x, r.y,comp.FashionClothesEnable,false);
                                     return false;
@@ -329,7 +330,7 @@ namespace Fashion_Wardrobe
                                     {
                                         pawn.apparel.Notify_ApparelChanged();
                                     }
-                                },extraPartWidth:20f,extraPartOnGUI: r =>
+                                },extraPartWidth:24f,extraPartOnGUI: r =>
                                 {
                                     Widgets.CheckboxDraw(r.x, r.y,comp.OnWorkNoDraft,false);
                                     return false;
@@ -339,8 +340,8 @@ namespace Fashion_Wardrobe
                             }));
                         }
                         Rect rect3 = new Rect(sr.x + sr.width + 5f, sr.y, (rect2.width - sr.width - 5) / 2, sr.height);
-                        
-                        if (cos&&Widgets.ButtonText(rect3, "Preset".Translate()))
+
+                        if (cos && Widgets.ButtonText(rect3, "Preset".Translate()))
                         {
                             if (floatMenu != null)
                             {
@@ -358,7 +359,7 @@ namespace Fashion_Wardrobe
                             selPreset = null;
                         }
                         rect3.x += rect3.width;
-                        if (cos&&Widgets.ButtonText(rect3, "Manage".Translate()))
+                        if (cos && Widgets.ButtonText(rect3, "Manage".Translate()))
                         {
                             if (!presetManager.IsOpen)
                             {
@@ -368,6 +369,16 @@ namespace Fashion_Wardrobe
                         }
                     }
                 }
+            }
+
+            private FWPresetApparelData CreatePresetFormApparel(Apparel apparel)
+            {
+                int pathIndex = -1;
+                if (apparel.StyleDef == null && apparel.def.apparel != null && !apparel.def.apparel.wornGraphicPaths.NullOrEmpty())
+                {
+                    pathIndex = apparel.def.apparel.wornGraphicPaths.IndexOf(apparel.WornGraphicPath);
+                }
+                return new FWPresetApparelData(apparel.DrawColor, apparel.StyleDef?.defName ?? "", pathIndex);
             }
 
             private bool DrawScroll(Rect inRect, FashionOverrideComp comp, List<Apparel> apparels = null)
@@ -380,19 +391,26 @@ namespace Fashion_Wardrobe
                     apparels = new List<Apparel>(comp.Clothes);
                     comp.SortCloths(ref apparels);
                 }
-                float height = 120f * apparels.Count + (drawRemove ? 60f : 0);
+                bool odysseyActive = ModsConfig.OdysseyActive;
+                float unitheight = odysseyActive ? 150f : 120f;
+                float height = unitheight * apparels.Count + (drawRemove ? 60f : 0);
                 bool a0 = height > inRect.height;
+
                 Rect view = new Rect(0, 0, inRect.width - (a0 ? 16f : 0), height);
                 Widgets.BeginScrollView(inRect, ref scrollPosition, view);
-                Rect iconLoc = new Rect(0, 0, 60f, 60f);
+                Rect iconLoc = new Rect(0, 0, 80f, 80f);
                 if (!apparels.NullOrEmpty())
                 {
-                    Rect butLoc = new Rect(4f, 80f, 52f, 20f);
-                    Rect LabelLoc = new Rect(60f, 0, view.width - 60f, 20f);
-                    Rect checkLoc = new Rect(60f, 20f, LabelLoc.width, 30f);
+                    Rect butLoc = new Rect(4f, unitheight - 40f, 72f, 30f);
+                    Rect LabelLoc = new Rect(iconLoc.width, 0, view.width - iconLoc.width, 20f);
+                    Rect checkLoc = new Rect(LabelLoc.x, 20f, LabelLoc.width, 30f);
+                    var h0 = "Hide".Translate();
+                    var h1 = "Hide_InDoor".Translate();
+                    var h2 = "ShowInVacuum".Translate();
+                    var h3 = "Hide_NoFight".Translate();
                     for (int x = 0; x < apparels.Count; x++)
                     {
-                        bool d = false;
+                        bool e = false;
                         Apparel apparel = apparels[x];
                         Widgets.ThingIcon(iconLoc, apparel);
                         if (drawRemove && apparel.GetComp<CompColorable>() != null)
@@ -410,8 +428,12 @@ namespace Fashion_Wardrobe
                                 }
                                 coStWork = true;
                                 colorAndStyle.def = apparel.def;
+                                colorAndStyle.initialStyle = apparel.StyleDef;
+                                colorAndStyle.withInitialStyle = true;
+                                colorAndStyle.initialColor = apparel.DrawColor;
+                                colorAndStyle.withInitialColor = true;
                                 colorAndStyle.Open = false;
-                                colorAndStyle.closeAction = (color, style) =>
+                                colorAndStyle.closeAction = (color, style, index) =>
                                 {
                                     if (apparel.GetComp<CompColorable>() != null)
                                     {
@@ -421,6 +443,10 @@ namespace Fashion_Wardrobe
                                     {
                                         apparel.SetStyleDef(style);
                                     }
+                                    if (index != -1 && style == null)
+                                    {
+                                        apparel.SetApparelIDNumberWithPathIndex(index);
+                                    }
                                     coStWork = false;
                                 };
                             }
@@ -428,7 +454,7 @@ namespace Fashion_Wardrobe
                         if (drawRemove && Widgets.ButtonText(butLoc, "Remove".Translate()))
                         {
                             comp.Clothes.Remove(apparel);
-                            d = true;
+                            e = true;
                         }
                         string label = drawRemove ? apparel.LabelNoParenthesisCap : apparel.LabelCap;
                         Widgets.DrawBoxSolid(LabelLoc, WidgetFillColor);
@@ -438,22 +464,24 @@ namespace Fashion_Wardrobe
                             comp.DrawRule.Add(apparel.def.defName, new FWCompData());
                         }
                         FWCompData data = comp.DrawRule[apparel.def.defName];
-                        CheckboxLabeled(checkLoc, "Hide".Translate(), ref data.Hide, out bool a);
+                        CheckboxLabeled(checkLoc, h0, ref data.Hide, out bool a);
                         checkLoc.y += 30f;
-                        CheckboxLabeled(checkLoc, "Hide_InDoor".Translate(), ref data.HideInDoor, out bool b, data.Hide);
+                        CheckboxLabeled(checkLoc, h1, ref data.HideInDoor, out bool b, data.Hide);
+                        checkLoc.y += 30f;
                         bool c = false;
-                        checkLoc.y += 30f;
-                        if (!drawRemove || !comp.OnWorkNoDraft)
+                        if (odysseyActive)
                         {
-                            CheckboxLabeled(checkLoc, "Hide_NoFight".Translate(), ref data.HideNoFight, out c, data.Hide);
+                            CheckboxLabeled(checkLoc, h2, ref data.HideNonVacuum, out c, data.Hide);
+                            checkLoc.y += 30f;
                         }
+                        CheckboxLabeled(checkLoc, h3, ref data.HideNoFight, out bool d, data.Hide || (drawRemove && comp.OnWorkNoDraft));
                         checkLoc.y += 35f;
                         Widgets.DrawLineHorizontal(view.x, checkLoc.y, view.width);
-                        iconLoc.y += 120f;
-                        butLoc.y += 120f;
-                        LabelLoc.y += 120f;
+                        iconLoc.y += 150f;
+                        butLoc.y += 150f;
+                        LabelLoc.y += 150f;
                         checkLoc.y += 25f;
-                        if (a || b || c || d)
+                        if (a || b || c || d || e)
                         {
                             active = true;
                         }
@@ -513,11 +541,14 @@ namespace Fashion_Wardrobe
             private bool open = false;
             private Color color = new ColorInt(255, 255, 255).ToColor;
             private ThingStyleDef selDef = null;
+            private int pathIndex = -1;
             private readonly string[] buffer = new string[4];
             private int mode = 0;
+            private List<ThingStyleDef> stylesCache = null;
             private bool drag = false;
             private bool styleWork = false;
             private bool colorWork = false;
+            private bool pathWork = false;
             private readonly int[] rgba = new int[4]
             {
                 255,
@@ -526,7 +557,12 @@ namespace Fashion_Wardrobe
                 255
             };
             internal ThingDef def;
-            internal Action<Color, ThingStyleDef> closeAction;
+            internal Action<Color, ThingStyleDef, int> closeAction;
+            internal ThingStyleDef initialStyle;
+            internal bool withInitialStyle = false;
+            internal bool initial = false;
+            internal Color initialColor = Color.white;
+            internal bool withInitialColor = false;
 
             private List<Color> colors;
             public bool Open
@@ -537,16 +573,67 @@ namespace Fashion_Wardrobe
                 }
                 set
                 {
-                    if (value && open == false)
+                    if (value && !open)
                     {
                         mode = 0;
                         drag = false;
                         styleWork = false;
                         colorWork = false;
-                        selDef = null;
+                        pathWork = false;
+                        if (def != null)
+                        {
+                            stylesCache = FWUtility.GetThingStyleDefs(def);
+                        }
+                        else
+                        {
+                            stylesCache = null;
+                        }
+                        if (!stylesCache.NullOrEmpty())
+                        {
+                            bool randomDef = true;
+                            if (withInitialStyle)
+                            {
+                                if (initialStyle == null)
+                                {
+                                    selDef = null;
+                                    randomDef = false;
+                                }
+                                else if (stylesCache.Contains(initialStyle))
+                                {
+                                    selDef = initialStyle;
+                                    randomDef = false;
+                                }
+                            }
+                            if (randomDef)
+                            {
+                                int num = UnityEngine.Random.Range(0, stylesCache.Count + 1);
+                                if (num < stylesCache.Count)
+                                {
+                                    selDef = stylesCache[num];
+                                }
+                                else
+                                {
+                                    selDef = null;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            selDef = null;
+                        }
+                        withInitialStyle = false;
+                        pathIndex = -1;
                         var list = DefDatabase<ColorDef>.AllDefs.Select(a => a.color);
                         colors = list.Distinct().ToList();
-                        color = colors.RandomElement();
+                        if (withInitialColor)
+                        {
+                            color = initialColor;
+                        }
+                        else
+                        {
+                            color = colors.RandomElement();
+                        }
+                        withInitialColor = false;
                         RefreshBuffer();
                     }
                     open = value;
@@ -554,55 +641,91 @@ namespace Fashion_Wardrobe
             }
             public void DoContentsWithCloseAction(Rect inRect, bool DrawStyle = true, bool DrawColor = true, bool drawClose = true, Action extraAction = null)
             {
-                Open = true;
-                if (!Open)
+                if (def == null)
                 {
                     return;
                 }
+                Open = true;
                 Rect rect = new Rect(inRect.x, inRect.y, inRect.width, 70f);
                 bool st = false;
-                if (DoStyleContents(rect))
+                float he = inRect.height;
+                if (ModsConfig.OdysseyActive && DoStyleContents(rect))
                 {
                     rect.y += rect.height;
+                    he -= rect.height;
                     st = true;
                 }
-                rect.height = inRect.height - 35f - (st ? rect.height : 0);
-                DoColorContents(rect);
+                if ((!st || selDef == null) && DoMultiGraphicContents(rect))
+                {
+                    rect.y += rect.height;
+                    he -= rect.height;
+                }
+                rect.height = he - 35f;
+                DoColorContents(rect, !st);
                 if (drawClose)
                 {
                     Rect cr = new Rect(inRect.x + inRect.width / 2 - 50f, inRect.yMax - 30f, 100f, 30f);
                     if (Widgets.ButtonText(cr, "Apply".Translate()))
                     {
                         open = false;
-                        closeAction?.Invoke(color, selDef);
+                        closeAction?.Invoke(color, selDef, pathIndex);
                         extraAction?.Invoke();
                         def = null;
+                        initialStyle = null;
+                        initial = false;
+                        withInitialStyle = false;
+                        initialColor = Color.white;
                     }
                 }
-                else if (styleWork || colorWork)
+                else if (styleWork || colorWork || pathWork || initial)
                 {
                     styleWork = false;
                     colorWork = false;
-                    closeAction?.Invoke(color, selDef);
+                    pathWork = false;
+                    initial = false;
+                    closeAction?.Invoke(color, selDef, pathIndex);
                     extraAction?.Invoke();
                 }
             }
+
+            public bool DoMultiGraphicContents(Rect inRect)
+            {
+                if (def == null || !def.HasThingIDNumber || def.apparel == null || def.apparel.wornGraphicPaths.NullOrEmpty())
+                {
+                    return false;
+                }
+                var wornGraphics = def.apparel.wornGraphicPaths;
+                Rect rect0 = new Rect(inRect.x, inRect.y, inRect.width, 30f);
+                Widgets.DrawBoxSolid(rect0, WidgetFillColor);
+                GUI.Label(rect0, "MultiGraphics".Translate(), MidCStyle);
+                if (pathIndex == -1)
+                {
+                    pathIndex = 0;
+                }
+                if (pathIndex > wornGraphics.Count - 1)
+                {
+                    pathIndex = wornGraphics.Count - 1;
+                }
+                Widgets.Label(rect0.LeftPart(0.7f), wornGraphics[pathIndex]);
+                if (Widgets.ButtonText(rect0.RightPart(0.3f), "Change".Translate()))
+                {
+                    var ls = new List<FloatMenuOption>();
+                    foreach (var wg in wornGraphics)
+                    {
+                        ls.Add(new FloatMenuOption(wg, () =>
+                        {
+                            pathIndex = wornGraphics.IndexOf(wg);
+                            pathWork = true;
+                        }));
+                    }
+                    Find.WindowStack.Add(new FloatMenu(ls));
+                }
+                return true;
+            }
+
             public bool DoStyleContents(Rect inRect)
             {
-                if (def == null)
-                {
-                    return false;
-                }
-                if (!def.CanBeStyled())
-                {
-                    return false;
-                }
-                List<ThingStyleDef> styles = DefDatabase<StyleCategoryDef>.AllDefs
-                                    .SelectMany(sc => sc.thingDefStyles?
-                                        .Where(ts => ts.ThingDef == def)
-                                        .Select(ts => ts.StyleDef) ?? Enumerable.Empty<ThingStyleDef>())
-                                    .ToList();
-                if (styles.NullOrEmpty())
+                if (stylesCache.NullOrEmpty())
                 {
                     return false;
                 }
@@ -624,11 +747,12 @@ namespace Fashion_Wardrobe
                 if (Widgets.ButtonText(rect0.RightPart(0.3f), "Change".Translate()))
                 {
                     var ls = new List<FloatMenuOption>();
-                    foreach (var st in styles)
+                    foreach (var st in stylesCache)
                     {
                         ls.Add(new FloatMenuOption(st.defName, () =>
                         {
                             selDef = st;
+                            pathIndex = -1;
                             styleWork = true;
                         }));
                     }
@@ -642,12 +766,20 @@ namespace Fashion_Wardrobe
 
                 return true;
             }
-            public void DoColorContents(Rect inRect)
+            public void DoColorContents(Rect inRect, bool drawIcon = false)
             {
                 int id = GetHashCode();
                 Rect rect0 = new Rect(inRect.x, inRect.y, inRect.width, 30f);
                 Widgets.DrawBoxSolid(rect0, WidgetFillColor);
-                GUI.Label(rect0, "Color".Translate(), MidCStyle);
+                if (drawIcon && def.uiIcon != null)
+                {
+                    GUI.Label(new Rect(rect0.x + rect0.height, rect0.y, rect0.width - rect0.height, rect0.height), "Color".Translate(), MidCStyle);
+                    GUI.DrawTexture(new Rect(rect0.x, rect0.y, rect0.height, rect0.height), def.uiIcon, ScaleMode.ScaleToFit, true, 0, color, 0, 0);
+                }
+                else
+                {
+                    GUI.Label(rect0, "Color".Translate(), MidCStyle);
+                }
                 rect0.y += 35f;
                 Rect mr = new Rect(rect0.x + 5f, rect0.y, (rect0.width - 20f) / 3, rect0.height);
                 string[] modes = new string[] {
@@ -702,6 +834,7 @@ namespace Fashion_Wardrobe
                 buffer[2] = rgba[2].ToString();
                 buffer[3] = rgba[3].ToString();
             }
+
             private void DrawModeOne(Rect rect0)
             {
                 float mar = (rect0.width + 2f) % 28f;
@@ -826,6 +959,7 @@ namespace Fashion_Wardrobe
             private ApparelLayerDef layerDef;
             private List<FloatMenuOption> Options = new List<FloatMenuOption>();
             private FWColorAndStyleWidget colorAndStyle;
+
             public SelApparelWindow()
             {
                 doCloseButton = true;
@@ -885,14 +1019,18 @@ namespace Fashion_Wardrobe
                     {
                         ThingDef def = filteredApparels[i];
                         Widgets.DrawBox(viewOne);
-                        if (RadioTexture(viewOne, false, def.uiIcon) ||
+                        if (RadioTexture(viewOne, false, def.uiIcon) |
                             Widgets.RadioButtonLabeled(textLoc, def.label, choose == def))
                         {
                             choose = def;
-                            apparel = null;
+                            if (apparel != null && apparel.def != choose)
+                            {
+                                apparel = null;
+                            }
                             if (colorAndStyle != null)
                             {
                                 colorAndStyle.Open = false;
+                                colorAndStyle.initial = true;
                             }
                         }
                         textLoc.y += itemHeight;
@@ -908,6 +1046,10 @@ namespace Fashion_Wardrobe
                     if (apparel == null || (apparel.def != def))
                     {
                         apparel = FWUtility.NewApparel(def);
+                        if (colorAndStyle != null)
+                        {
+                            colorAndStyle.initialStyle = apparel.StyleDef;
+                        }
                     }
                     if (colorAndStyle == null)
                     {
@@ -916,7 +1058,7 @@ namespace Fashion_Wardrobe
                     colorAndStyle.def = def;
                     bool aa = apparel.def?.CanBeStyled() ?? false;
                     bool ab = apparel.GetComp<CompColorable>() != null;
-                    colorAndStyle.closeAction = (color, style) =>
+                    colorAndStyle.closeAction = (color, style, index) =>
                     {
                         if (aa)
                         {
@@ -926,8 +1068,11 @@ namespace Fashion_Wardrobe
                         {
                             apparel.SetColor(color);
                         }
+                        if (index != -1 && style == null)
+                        {
+                            apparel.SetApparelIDNumberWithPathIndex(index);
+                        }
                     };
-
                     Rect bot = rect1.BottomPart(0.68f);
                     Rect top = rect1.TopPart(0.3f);
                     colorAndStyle.DoContentsWithCloseAction(bot, aa, ab, false);
@@ -1146,7 +1291,7 @@ namespace Fashion_Wardrobe
                                     }
                                     colorAndStyle.def = def;
                                     colorAndStyle.Open = false;
-                                    colorAndStyle.closeAction = (color, style) =>
+                                    colorAndStyle.closeAction = (color, style, index) =>
                                     {
                                         if (!selPreset.apparels.NullOrEmpty())
                                         {
@@ -1160,7 +1305,7 @@ namespace Fashion_Wardrobe
                                         {
                                             selPreset.apparels = new Dictionary<string, FWPresetApparelData>();
                                         }
-                                        selPreset.apparels.SetOrAdd(def.defName, new FWPresetApparelData(color, style?.defName ?? ""));
+                                        selPreset.apparels.SetOrAdd(def.defName, new FWPresetApparelData(color, style?.defName ?? "", index));
                                         coStWork = false;
                                     };
                                     coStWork = true;

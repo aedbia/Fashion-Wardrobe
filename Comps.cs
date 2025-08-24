@@ -191,18 +191,14 @@ namespace Fashion_Wardrobe
                 for (int i = 0; i < wornApparel.Count; i++)
                 {
                     Apparel apparel = wornApparel[i];
-                    if (!list0.Any(b => ApparelUtility.CanWearTogether(apparel.def, b.def, pawn.RaceProps?.body ?? BodyDefOf.Human)))
+                    if (list0.All(b => ApparelUtility.CanWearTogether(apparel.def, b.def, pawn.RaceProps?.body ?? BodyDefOf.Human)))
                     {
                         list1.Add(apparel);
                     }
                     AddDefaultDrawRule(apparel.def.defName);
                 }
-                if (flag)
-                {
-                    list1.AddRange(list0);
-                }
             }
-            else if (flag)
+            if (flag)
             {
                 list1.AddRange(list0);
             }
@@ -228,25 +224,36 @@ namespace Fashion_Wardrobe
 
         public void SortCloths(ref List<Apparel> apparels)
         {
-            apparels.Sort((Apparel a, Apparel b) =>
+            if (apparels.NullOrEmpty())
             {
-                int ai = a.def.apparel.LastLayer.drawOrder;
-                int bi = b.def.apparel.LastLayer.drawOrder;
-                var aTag = a.def.apparel.tags;
-                if (!aTag.NullOrEmpty() && aTag.Contains("ABVisiblePants"))
-                {
-                    ai -= 1;
-                }
-                var bTag = b.def.apparel.tags;
-                if (!bTag.NullOrEmpty() && bTag.Contains("ABVisiblePants"))
-                {
-                    bi -= 1;
-                }
-                return ai.CompareTo(bi);
-            });
+                return;
+            }
+            apparels.Sort((Apparel a, Apparel b) => GetPriority(a, b));
         }
+        private int GetPriority(Apparel a, Apparel b)
+        {
+            int ai = a.def.apparel.LastLayer.drawOrder;
+            int bi = b.def.apparel.LastLayer.drawOrder;
+            var aTag = a.def.apparel.tags;
+            if (!aTag.NullOrEmpty() && aTag.Contains("ABVisiblePants"))
+            {
+                ai -= 1;
+            }
+            var bTag = b.def.apparel.tags;
+            if (!bTag.NullOrEmpty() && bTag.Contains("ABVisiblePants"))
+            {
+                bi -= 1;
+            }
+            return ai.CompareTo(bi);
+        }
+
         public void RemoveNoDisplayGraphic(ref List<Apparel> apparels)
         {
+            var map = pawn.MapHeld;
+            var pos = pawn.Position;
+            bool posInMap = map != null && pos.InBounds(map);
+            bool inVacuum = posInMap && map.Biome.inVacuum && pos.GetVacuum(map) < 0.5f;
+            bool InDoor = posInMap && !pawn.Position.UsesOutdoorTemperature(map);
             apparels.RemoveAll(a =>
             {
                 if (!DrawRule.NullOrEmpty() && DrawRule.ContainsKey(a.def.defName))
@@ -264,17 +271,21 @@ namespace Fashion_Wardrobe
                                 return true;
                             }
                         }
-                        else
+                        else if (FWSetting.ShowInDoorFight)
                         {
-                            if (FWSetting.ShowInDoorFight)
-                            {
-                                return false;
-                            }
+                            return false;
                         }
-
-                        if (data.HideInDoor && pawn.Map != null && !pawn.Position.UsesOutdoorTemperature(pawn.Map))
+                        if (posInMap)
                         {
-                            return true;
+                            if (ModsConfig.OdysseyActive && data.HideNonVacuum)
+                            {
+                                return inVacuum;
+                            }
+                            else
+                            if (data.HideInDoor && InDoor)
+                            {
+                                return true;
+                            }
                         }
                     }
                 }
@@ -290,18 +301,33 @@ namespace Fashion_Wardrobe
             }
             foreach (string defName in preset.apparels.Keys)
             {
-                Apparel apparel = FWUtility.NewApparel(ThingDef.Named(defName));
+                var def = ThingDef.Named(defName);
+                if (def == null)
+                {
+                    continue;
+                }
+                Apparel apparel = FWUtility.NewApparel(def);
                 if (apparel != null)
                 {
-                    if (apparel.GetComp<CompColorable>() != null && preset.apparels.TryGetValue(defName, out FWPresetApparelData aData))
+                    if (preset.apparels.TryGetValue(defName, out FWPresetApparelData aData))
                     {
-                        apparel.SetColor(aData.color);
+                        if (apparel.GetComp<CompColorable>() != null)
+                        {
+                            apparel.SetColor(aData.color);
+                        }
                         if (!aData.styleDef.NullOrEmpty())
                         {
                             ThingStyleDef styleDef = DefDatabase<ThingStyleDef>.GetNamedSilentFail(aData.styleDef);
                             if (styleDef != null)
                             {
                                 apparel.SetStyleDef(styleDef);
+                            }
+                        }
+                        else
+                        {
+                            if (aData.pathIndex != -1)
+                            {
+                                apparel.SetApparelIDNumberWithPathIndex(aData.pathIndex);
                             }
                         }
                     }
@@ -334,12 +360,14 @@ namespace Fashion_Wardrobe
         public bool Hide = false;
         public bool HideInDoor = false;
         public bool HideNoFight = false;
+        public bool HideNonVacuum = false;
 
         public void ExposeData()
         {
             Scribe_Values.Look(ref Hide, "HideValue", false);
             Scribe_Values.Look(ref HideInDoor, "HideInDoor", false);
             Scribe_Values.Look(ref HideNoFight, "HideNoFight", false);
+            Scribe_Values.Look(ref HideNoFight, "HideNonVacuum", false);
         }
     }
 

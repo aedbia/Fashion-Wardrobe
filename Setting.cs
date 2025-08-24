@@ -82,19 +82,22 @@ namespace Fashion_Wardrobe
     {
         public Color color = Color.white;
         public string styleDef;
+        public int pathIndex;
         public FWPresetApparelData()
         {
         }
-        public FWPresetApparelData(Color color, string styleDef)
+        public FWPresetApparelData(Color color, string styleDef, int pathIndex)
         {
             this.color = color;
             this.styleDef = styleDef;
+            this.pathIndex = pathIndex;
         }
 
         public void ExposeData()
         {
             Scribe_Values.Look(ref color, "color");
             Scribe_Values.Look(ref styleDef, "StyleDef");
+            Scribe_Values.Look(ref pathIndex, "pathIndex",-1);
         }
     }
 }

@@ -114,12 +114,13 @@ namespace Fashion_Wardrobe
                 Widgets.CheckboxLabeled(rect0, "Hide".Translate(), ref data.Hide);
                 rect0.y += 35f;
                 Widgets.DrawHighlightIfMouseover(rect0);
-                Widgets.CheckboxLabeled(rect0, "Hide_InDoor".Translate(), ref data.Hide);
+                Widgets.CheckboxLabeled(rect0, "Hide_InDoor".Translate(), ref data.HideInDoor);
                 rect0.y += 35f;
                 Widgets.DrawHighlightIfMouseover(rect0);
-                Widgets.CheckboxLabeled(rect0, "Hide_NoFight".Translate(), ref data.Hide);
+                Widgets.CheckboxLabeled(rect0, "ShowInVacuum".Translate(), ref data.HideNonVacuum);
                 rect0.y += 35f;
-                rect0.height = 300f;
+                Widgets.DrawHighlightIfMouseover(rect0);
+                Widgets.CheckboxLabeled(rect0, "Hide_NoFight".Translate(), ref data.HideNoFight);
             }
         }
         private void DoNormalSettingsContents(Rect inRect)
@@ -287,6 +288,35 @@ namespace Fashion_Wardrobe
             }
             Apparel thing = (Apparel)ThingMaker.MakeThing(def, stuff);
             return thing;
+        }
+        public static void SetApparelIDNumberWithPathIndex(this Apparel apparel, int number)
+        {
+            if (apparel.def.HasThingIDNumber)
+            {
+                var paths = apparel.def.apparel?.wornGraphicPaths;
+                if (!paths.NullOrEmpty() && number < paths.Count && paths[number] != apparel.WornGraphicPath)
+                {
+                    apparel.thingIDNumber += number - apparel.thingIDNumber % paths.Count;
+                }
+            }
+        }
+        public static List<ThingStyleDef> GetThingStyleDefs(ThingDef def)
+        {
+            if (def == null||!def.CanBeStyled())
+            {
+                return new List<ThingStyleDef>();
+            }
+            List<ThingStyleDef> styles = DefDatabase<StyleCategoryDef>.AllDefs
+                                .SelectMany(sc => sc.thingDefStyles?
+                                    .Where(ts => ts.ThingDef == def)
+                                    .Select(ts => ts.StyleDef) ?? Enumerable.Empty<ThingStyleDef>())
+                                .ToList();
+            var random = def.randomStyle?.Select(a => a.StyleDef);
+            if (random != null && random.Any())
+            {
+                styles.AddRangeUnique(random);
+            }
+            return styles;
         }
     }
 
